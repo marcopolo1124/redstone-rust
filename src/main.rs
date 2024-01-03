@@ -1,25 +1,30 @@
 pub mod block;
 pub use block::*;
 
-pub const MAP_SIZE: (usize, usize) = (3, 10);
+pub const MAP_SIZE: (usize, usize) = (3, 4);
 pub type Map = [[Option<Block>; MAP_SIZE.0]; MAP_SIZE.1];
 
 pub use std::collections::HashSet;
 
-fn translate_map(map: &Map) -> [[u8; MAP_SIZE.0]; MAP_SIZE.1] {
-    let mut signal_array = [[0; MAP_SIZE.0]; MAP_SIZE.1];
+fn translate_map(map: &Map) {
+    let mut signal_array = [[(0, 0); MAP_SIZE.0]; MAP_SIZE.1];
     for x in 0..map.len() {
         for y in 0..map[x].len() {
             let blk = &map[x][y];
             match *blk {
                 Some(Block { kind: BlockKind::Redstone(Redstone { signal, .. }), .. }) => {
-                    signal_array[x][y] = signal;
+                    signal_array[x][y] = (signal, 0);
+                }
+                Some(Block{ kind: BlockKind::Opaque { strong_signal, weak_signal }, ..}) => {
+                    signal_array[x][y] = (strong_signal, weak_signal);
                 }
                 _ => (),
             }
         }
     }
-    signal_array
+    for row in signal_array {
+        println!("{:?}", row);
+    }
 }
 
 fn main() {
@@ -71,49 +76,31 @@ fn main() {
             place(&redstone_dust, x, y, Orientation::Up);
         }
     }
-
-    let signal_array = translate_map(&map);
-    for row in signal_array {
-        println!("{:?}", row);
-    }
-    println!("{:?}", redstone_block_off_delay);
-    let i = 0;
+    let mut i = 0;
     while i < 3 {
         for (curr_x, curr_y) in redstone_block_on_delay.clone() {
-            set_power(
+            println!("setting power at {curr_x} {curr_y}");
+            set_power(&mut map, curr_x, curr_y, 0, None, &mut redstone_block_off_delay);
+        }
+        redstone_block_on_delay.clear();
+        println!("");
+        translate_map(&map);
+
+        for (curr_x, curr_y) in redstone_block_off_delay.clone() {
+            set_power_to_0(
                 &mut map,
                 curr_x,
                 curr_y,
-                17,
                 None,
-                &mut redstone_block_off_delay,
+                20,
+                &mut redstone_block_on_delay,
+                &mut redstone_block_off_delay
             );
         }
-            for (curr_x, curr_y) in redstone_block_off_delay.clone() {
-                set_power_to_0(
-                    &mut map,
-                    curr_x,
-                    curr_y,
-                    None,
-                    20,
-                    &mut redstone_block_on_delay,
-                    &mut redstone_block_off_delay
-                );
-            }
-        
-
-
-
+        redstone_block_off_delay.clear();
+        println!("");
+        println!("{:?}", redstone_block_on_delay);
+        translate_map(&map);
+        i += 1;
     }
-
-    // destroy(&mut map, 1, 1);
-
-    let signal_array = translate_map(&map);
-    println!("off");
-    for row in signal_array {
-        println!("{:?}", row);
-    }
-
-    println!("{:?}", redstone_block_off_delay);
-    println!("{:?}", redstone_block_on_delay);
 }
