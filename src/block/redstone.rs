@@ -48,7 +48,6 @@ fn get_power_update_value(kind: RedstoneKind, current_signal: u8, signal: u8) ->
     match kind {
         RedstoneKind::Block => cmp::max(current_signal, signal),
         RedstoneKind::Torch => {
-            // println!("torch found, input signal is {signal}");
             if signal == 0 {
                 16
             } else {
@@ -227,6 +226,11 @@ fn prev_output_signal(blk: &Option<Block>, ind: usize) -> (u8, Option<SignalType
             Block { kind: BlockKind::Redstone(Redstone { output_ports, signal, kind, .. }), .. },
         ) => {
             if output_ports[ind] { (signal, Some(get_signal_type(kind))) } else { (0, None) }
+        }
+        Some(
+            Block {kind: BlockKind::Opaque { strong_signal, .. }, ..}
+        ) => {
+            (strong_signal, None)
         }
         _ => (0, None),
     }
