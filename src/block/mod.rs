@@ -14,7 +14,7 @@ pub struct Block {
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum TextureName{
+pub enum TextureName {
     Dirt,
     RedstoneTorch(bool),
     RedstoneDust(bool),
@@ -26,66 +26,76 @@ pub fn place(
     y: usize,
     facing: Orientation,
     map: &mut Map,
-    redstone_listener: &mut Listener,
-    redstone_source_listener: &mut Listener,
-    mechanism_listener: &mut Listener,
+    redstone_block_off_delay: &mut HashSet<(usize, usize)>,
+    mechanism_listener: &mut Listener
 ) {
     if map[x][y] != None {
         return;
     }
     match blk.kind {
-        BlockKind::Redstone(Redstone{ signal, input_ports, output_ports, kind }) => {
-            let redstone = place_redstone(
-                redstone_listener,
-                redstone_source_listener,
-                x,
-                y,
-                signal,
-                facing,
-                kind,
-                input_ports,
-                output_ports
-            );
-            map[x][y] = Some(Block { kind: BlockKind::Redstone(redstone), orientation: facing, ..*blk });
+        BlockKind::Redstone(Redstone { signal, input_ports, output_ports, kind }) => {
+            let redstone = place_redstone(signal, facing, kind, input_ports, output_ports);
+            map[x][y] = Some(Block {
+                kind: BlockKind::Redstone(redstone),
+                orientation: facing,
+                ..*blk
+            });
             let (prev_signal, signal_type) = get_prev_signal(map, x, y, redstone.input_ports);
-            set_power(map, x, y, prev_signal, signal_type);
+            set_power(map, x, y, prev_signal, signal_type, redstone_block_off_delay);
         }
         BlockKind::Mechanism { kind } => {
             let mechanism = place_mechanism(map, mechanism_listener, x, y, facing, kind);
             map[x][y] = Some(Block { kind: mechanism, orientation: facing, ..*blk });
         }
-        BlockKind::Transparent => map[x][y] = Some(Block { orientation: facing, ..*blk }),
+        BlockKind::Transparent => {
+            map[x][y] = Some(Block { orientation: facing, ..*blk });
+        }
         BlockKind::Opaque { .. } => {
             map[x][y] = Some(Block { orientation: facing, ..*blk });
             let (prev_signal, signal_type) = get_prev_signal(map, x, y, [true, true, true, true]);
-            set_power(map, x, y, prev_signal, signal_type)
+            set_power(map, x, y, prev_signal, signal_type, redstone_block_off_delay)
         }
     };
 }
 
-
-pub fn destroy(map: &mut Map, x: usize, y: usize){
+pub fn destroy(
+    map: &mut Map,
+    x: usize,
+    y: usize,
+    redstone_block_off_delay: &mut HashSet<(usize, usize)>,
+    redstone_block_on_delay: &mut HashSet<(usize, usize)>
+) {
     let blk = &map[x][y];
-    match *blk{
-        Some(Block{kind, ..}) => {
+    match *blk {
+        Some(Block { kind, .. }) => {
             match kind {
                 BlockKind::Redstone(Redstone { signal, output_ports, kind, .. }) => {
                     let next_blocks = get_next(&map, x, y, output_ports);
                     let signal_type = Some(get_signal_type(kind));
                     map[x][y] = None;
-                    for (next_x, next_y) in next_blocks{
-                        set_power_to_0(map, next_x, next_y, signal_type, signal)
+                    for (next_x, next_y) in next_blocks {
+                        set_power_to_0(
+                            map,
+                            next_x,
+                            next_y,
+                            signal_type,
+                            signal,
+                            redstone_block_on_delay,
+                            redstone_block_off_delay
+                        );
                     }
-                },
-                _ => map[x][y] = None
+                }
+                _ => {
+                    map[x][y] = None;
+                }
             }
-        },
+        }
 
-        _ => return
+        _ => {
+            return;
+        }
     }
-
 }
-
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum BlockKind {
@@ -94,7 +104,7 @@ pub enum BlockKind {
         strong_signal: u8,
         weak_signal: u8,
     },
-    Redstone (Redstone),
+    Redstone(Redstone),
     Mechanism {
         kind: MechanismKind,
     },

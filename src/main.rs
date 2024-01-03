@@ -4,13 +4,15 @@ pub use block::*;
 pub const MAP_SIZE: (usize, usize) = (3, 10);
 pub type Map = [[Option<Block>; MAP_SIZE.0]; MAP_SIZE.1];
 
+pub use std::collections::HashSet;
+
 fn translate_map(map: &Map) -> [[u8; MAP_SIZE.0]; MAP_SIZE.1] {
     let mut signal_array = [[0; MAP_SIZE.0]; MAP_SIZE.1];
     for x in 0..map.len() {
         for y in 0..map[x].len() {
             let blk = &map[x][y];
             match *blk {
-                Some(Block { kind: BlockKind::Redstone(Redstone{ signal, .. }), .. }) => {
+                Some(Block { kind: BlockKind::Redstone(Redstone { signal, .. }), .. }) => {
                     signal_array[x][y] = signal;
                 }
                 _ => (),
@@ -22,11 +24,11 @@ fn translate_map(map: &Map) -> [[u8; MAP_SIZE.0]; MAP_SIZE.1] {
 
 fn main() {
     let mut map: Map = std::array::from_fn(|_| { std::array::from_fn(|_| { None }) });
-    let mut redstone_listener: Listener = vec![];
-    let mut redstone_source_listener: Listener = vec![];
+    let mut redstone_block_on_delay: HashSet<(usize, usize)> = HashSet::new();
+    let mut redstone_block_off_delay: HashSet<(usize, usize)> = HashSet::new();
     let mut mechanism_listener: Listener = vec![];
 
-    let dirt = Block {
+    let _dirt = Block {
         texture_name: TextureName::Dirt,
         movable: true,
         orientation: Orientation::Up,
@@ -37,7 +39,7 @@ fn main() {
         texture_name: TextureName::RedstoneDust(false),
         movable: false,
         orientation: Orientation::Up,
-        kind: BlockKind::Redstone (Redstone{
+        kind: BlockKind::Redstone(Redstone {
             signal: 0,
             input_ports: [true, true, true, true],
             output_ports: [true, true, true, true],
@@ -49,7 +51,7 @@ fn main() {
         movable: false,
         texture_name: TextureName::RedstoneTorch(true),
         orientation: Orientation::Up,
-        kind: BlockKind::Redstone( Redstone{
+        kind: BlockKind::Redstone(Redstone {
             signal: 16,
             input_ports: [false, false, true, false],
             output_ports: [true, true, false, true],
@@ -58,16 +60,7 @@ fn main() {
     };
 
     let mut place = |blk: &Block, x: usize, y: usize, facing: Orientation| {
-        place(
-            blk,
-            x,
-            y,
-            facing,
-            &mut map,
-            &mut redstone_listener,
-            &mut redstone_source_listener,
-            &mut mechanism_listener
-        )
+        place(blk, x, y, facing, &mut map, &mut redstone_block_off_delay, &mut mechanism_listener)
     };
 
     place(&redstone_torch, 1, 1, Orientation::Up);
@@ -83,11 +76,44 @@ fn main() {
     for row in signal_array {
         println!("{:?}", row);
     }
+    println!("{:?}", redstone_block_off_delay);
+    let i = 0;
+    while i < 3 {
+        for (curr_x, curr_y) in redstone_block_on_delay.clone() {
+            set_power(
+                &mut map,
+                curr_x,
+                curr_y,
+                17,
+                None,
+                &mut redstone_block_off_delay,
+            );
+        }
+            for (curr_x, curr_y) in redstone_block_off_delay.clone() {
+                set_power_to_0(
+                    &mut map,
+                    curr_x,
+                    curr_y,
+                    None,
+                    20,
+                    &mut redstone_block_on_delay,
+                    &mut redstone_block_off_delay
+                );
+            }
+        
 
-    destroy(&mut map, 1, 1);
+
+
+    }
+
+    // destroy(&mut map, 1, 1);
+
     let signal_array = translate_map(&map);
-    println!("\n");
+    println!("off");
     for row in signal_array {
         println!("{:?}", row);
     }
+
+    println!("{:?}", redstone_block_off_delay);
+    println!("{:?}", redstone_block_on_delay);
 }

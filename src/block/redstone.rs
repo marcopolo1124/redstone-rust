@@ -30,20 +30,12 @@ pub enum SignalType {
 }
 
 pub fn place_redstone(
-    listener: &mut Listener,
-    source_listener: &mut Listener,
-    x: usize,
-    y: usize,
     signal: u8,
     orientation: Orientation,
     kind: RedstoneKind,
     input_ports: Ports,
     output_ports: Ports
 ) -> Redstone {
-    match kind {
-        RedstoneKind::Block => listener.push((x, y)),
-        _ => source_listener.push((x, y)),
-    }
 
     Redstone {
         signal,
@@ -56,9 +48,7 @@ pub fn place_redstone(
 fn get_power_update_value(kind: RedstoneKind, current_signal: u8, signal: u8) -> u8 {
     match kind {
         RedstoneKind::Block => cmp::max(current_signal, signal),
-        RedstoneKind::Torch => {
-            current_signal
-        }
+        RedstoneKind::Torch => current_signal,
         RedstoneKind::Repeater => current_signal,
     }
 }
@@ -68,7 +58,9 @@ pub fn set_power_to_0(
     x: usize,
     y: usize,
     signal_type: Option<SignalType>,
-    prev_signal: u8
+    prev_signal: u8,
+    redstone_block_on_delay: &mut HashSet<(usize, usize)>,
+    redstone_block_off_delay: &mut HashSet<(usize, usize)>
 ) {
     let blk: &mut Option<Block> = &mut map[x][y];
     let (output_ports, input_ports, curr_signal, signal_type) = match *blk {
@@ -81,10 +73,30 @@ pub fn set_power_to_0(
             },
         ) => {
             let curr_signal = *signal;
-            if prev_signal > curr_signal{
+            if prev_signal > curr_signal {
                 *signal = 0;
-            };
+            }
+            match kind {
+                RedstoneKind::Torch => {redstone_block_on_delay.insert((x, y));},
+                _ => (),
+            }
             (output_ports, input_ports, curr_signal, Some(get_signal_type(kind)))
+        }
+        Some(
+            Block { kind: BlockKind::Opaque { ref mut strong_signal, ref mut weak_signal }, .. },
+        ) => {
+            match signal_type {
+                Some(SignalType::Weak) => {
+                    *weak_signal = 0;
+                    ([false, false, false, false], [false, false, false, false], 0, None)
+                }
+                Some(SignalType::Strong) => {
+                    let curr_signal = *strong_signal;
+                    *strong_signal = 0;
+                    ([true, true, true, true], [true, true, true, true], curr_signal, None)
+                }
+                _ => ([false, false, false, false], [false, false, false, false], 0, None),
+            }
         }
 
         _ => ([false, false, false, false], [false, false, false, false], 0, None),
@@ -94,17 +106,22 @@ pub fn set_power_to_0(
         return;
     }
 
-    // println!("{x} {y}");
-
     let next_coord = get_next(map, x, y, output_ports);
     for (next_x, next_y) in next_coord {
-        set_power_to_0(map, next_x, next_y, signal_type, curr_signal);
+        set_power_to_0(
+            map,
+            next_x,
+            next_y,
+            signal_type,
+            curr_signal,
+            redstone_block_on_delay,
+            redstone_block_off_delay
+        );
     }
 
     let (prev_signal, signal_type) = get_prev_signal(map, x, y, input_ports);
-    // println!("x: {x}, y: {y}, prev: {prev_signal}, curr: {curr_signal}");
     if prev_signal + 1 >= curr_signal {
-        set_power(map, x, y, prev_signal, signal_type);
+        set_power(map, x, y, prev_signal, signal_type, redstone_block_off_delay);
     }
 }
 
@@ -113,7 +130,8 @@ pub fn set_power(
     x: usize,
     y: usize,
     input_signal: u8,
-    signal_type: Option<SignalType>
+    signal_type: Option<SignalType>,
+    redstone_block_off_delay: &mut HashSet<(usize, usize)>
 ) {
     if input_signal <= 1 {
         return;
@@ -130,6 +148,10 @@ pub fn set_power(
             let update_value = get_power_update_value(kind, *signal, input_signal);
             let updated = *signal < update_value;
             *signal = update_value;
+            match kind {
+                RedstoneKind::Torch => {redstone_block_off_delay.insert((x, y));},
+                _ => (),
+            }
             (updated, *signal, output_ports, Some(get_signal_type(kind)))
         }
         Some(
@@ -154,7 +176,7 @@ pub fn set_power(
     if updated {
         let next_blocks = get_next(map, x, y, output_ports);
         for (next_x, next_y) in next_blocks {
-            set_power(map, next_x, next_y, signal - 1, signal_type);
+            set_power(map, next_x, next_y, signal - 1, signal_type, redstone_block_off_delay);
         }
     }
 }
