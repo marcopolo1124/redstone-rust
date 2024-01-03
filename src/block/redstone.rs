@@ -8,12 +8,25 @@ pub enum RedstoneKind {
     Block,
 }
 
+pub fn get_signal_type(kind: RedstoneKind) -> SignalType {
+    match kind {
+        RedstoneKind::Torch | RedstoneKind::Repeater => SignalType::Strong,
+        RedstoneKind::Block => SignalType::Weak,
+    }
+}
+
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Redstone {
     pub signal: u8,
     pub input_ports: Ports,
     pub output_ports: Ports,
     pub kind: RedstoneKind,
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum SignalType {
+    Weak,
+    Strong,
 }
 
 pub fn place_redstone(
@@ -27,7 +40,6 @@ pub fn place_redstone(
     input_ports: Ports,
     output_ports: Ports
 ) -> Redstone {
-
     match kind {
         RedstoneKind::Block => listener.push((x, y)),
         _ => source_listener.push((x, y)),
@@ -41,55 +53,123 @@ pub fn place_redstone(
     }
 }
 
-fn get_power_update_value(kind: RedstoneKind, current_signal: u8, signal: u8, redstone_was_off: &mut bool) -> u8 {
+fn get_power_update_value(kind: RedstoneKind, current_signal: u8, signal: u8) -> u8 {
     match kind {
         RedstoneKind::Block => cmp::max(current_signal, signal),
         RedstoneKind::Torch => {
-            if signal > 0 {
-                *redstone_was_off = true;
-                0
-            } else { 16 }
+            current_signal
         }
-        RedstoneKind::Repeater => 0,
+        RedstoneKind::Repeater => current_signal,
     }
 }
 
-pub fn set_power(map: &mut Map, x: usize, y: usize, input_signal: u8, redstone_was_off: &mut bool) {
+pub fn set_power_to_0(
+    map: &mut Map,
+    x: usize,
+    y: usize,
+    signal_type: Option<SignalType>,
+    prev_signal: u8
+) {
+    let blk: &mut Option<Block> = &mut map[x][y];
+    let (output_ports, input_ports, curr_signal, signal_type) = match *blk {
+        Some(
+            Block {
+                kind: BlockKind::Redstone(
+                    Redstone { ref mut signal, kind, output_ports, input_ports, .. },
+                ),
+                ..
+            },
+        ) => {
+            let curr_signal = *signal;
+            if prev_signal > curr_signal{
+                *signal = 0;
+            };
+            (output_ports, input_ports, curr_signal, Some(get_signal_type(kind)))
+        }
+
+        _ => ([false, false, false, false], [false, false, false, false], 0, None),
+    };
+
+    if curr_signal >= prev_signal || curr_signal == 0 {
+        return;
+    }
+
+    // println!("{x} {y}");
+
+    let next_coord = get_next(map, x, y, output_ports);
+    for (next_x, next_y) in next_coord {
+        set_power_to_0(map, next_x, next_y, signal_type, curr_signal);
+    }
+
+    let (prev_signal, signal_type) = get_prev_signal(map, x, y, input_ports);
+    // println!("x: {x}, y: {y}, prev: {prev_signal}, curr: {curr_signal}");
+    if prev_signal + 1 >= curr_signal {
+        set_power(map, x, y, prev_signal, signal_type);
+    }
+}
+
+pub fn set_power(
+    map: &mut Map,
+    x: usize,
+    y: usize,
+    input_signal: u8,
+    signal_type: Option<SignalType>
+) {
     if input_signal <= 1 {
         return;
     }
 
     let blk: &mut Option<Block> = &mut map[x][y];
-    let (updated, signal, output_ports) = match *blk {
+    let (updated, signal, output_ports, signal_type) = match *blk {
         Some(
-            Block { kind: BlockKind::Redstone(Redstone{ref mut signal, kind, output_ports, .. }), .. },
+            Block {
+                kind: BlockKind::Redstone(Redstone { ref mut signal, kind, output_ports, .. }),
+                ..
+            },
         ) => {
-            let update_value = get_power_update_value(kind, *signal, input_signal, redstone_was_off);
+            let update_value = get_power_update_value(kind, *signal, input_signal);
             let updated = *signal < update_value;
             *signal = update_value;
-            (updated, *signal, output_ports)
+            (updated, *signal, output_ports, Some(get_signal_type(kind)))
+        }
+        Some(
+            Block { kind: BlockKind::Opaque { ref mut strong_signal, ref mut weak_signal }, .. },
+        ) => {
+            match signal_type {
+                Some(SignalType::Strong) => {
+                    *strong_signal = input_signal;
+                    (true, input_signal, [true, true, true, true], None)
+                }
+                Some(SignalType::Weak) => {
+                    *weak_signal = input_signal;
+                    (false, 0, [false, false, false, false], None)
+                }
+                None => (false, 0, [false, false, false, false], None),
+            }
         }
 
-        _ => (false, 0, [false, false, false, false]),
+        _ => (false, 0, [false, false, false, false], None),
     };
 
     if updated {
         let next_blocks = get_next(map, x, y, output_ports);
         for (next_x, next_y) in next_blocks {
-            set_power(map, next_x, next_y, signal - 1, redstone_was_off);
+            set_power(map, next_x, next_y, signal - 1, signal_type);
         }
     }
 }
 
 fn required_input_port(blk: &Option<Block>, ind: usize) -> bool {
     match *blk {
-        Some(Block { kind: BlockKind::Redstone (Redstone{ input_ports, .. }), .. }) => { input_ports[ind] }
+        Some(Block { kind: BlockKind::Redstone(Redstone { input_ports, .. }), .. }) => {
+            input_ports[ind]
+        }
         Some(Block { kind: BlockKind::Opaque { .. }, .. }) => true,
         _ => false,
     }
 }
 
-fn get_next(map: &Map, x: usize, y: usize, output_ports: Ports) -> Vec<(usize, usize)> {
+pub fn get_next(map: &Map, x: usize, y: usize, output_ports: Ports) -> Vec<(usize, usize)> {
     let mut next_blk: Vec<(usize, usize)> = vec![];
 
     if output_ports[0] && x > 0 && required_input_port(&map[x - 1][y], 2) {
@@ -107,32 +187,56 @@ fn get_next(map: &Map, x: usize, y: usize, output_ports: Ports) -> Vec<(usize, u
     next_blk
 }
 
-fn prev_output_signal(blk: &Option<Block>, ind: usize) -> u8 {
+fn prev_output_signal(blk: &Option<Block>, ind: usize) -> (u8, Option<SignalType>) {
     match *blk {
-        Some(Block { kind: BlockKind::Redstone (Redstone{ output_ports, signal, .. }), .. }) => {
-            if output_ports[ind] { signal } else { 0 }
+        Some(
+            Block { kind: BlockKind::Redstone(Redstone { output_ports, signal, kind, .. }), .. },
+        ) => {
+            if output_ports[ind] { (signal, Some(get_signal_type(kind))) } else { (0, None) }
         }
-        _ => 0,
+        _ => (0, None),
     }
 }
 
-pub fn get_prev_signal(map: &Map, x: usize, y: usize, input_ports: Ports) -> u8 {
+pub fn get_prev_signal(
+    map: &Map,
+    x: usize,
+    y: usize,
+    input_ports: Ports
+) -> (u8, Option<SignalType>) {
     let mut signal = 1;
+    let mut signal_type = None;
 
     if input_ports[0] && x > 0 {
-        signal = cmp::max(prev_output_signal(&map[x - 1][y], 2), signal);
+        let (curr_signal, curr_signal_type) = prev_output_signal(&map[x - 1][y], 2);
+        if curr_signal > signal {
+            signal = curr_signal;
+            signal_type = curr_signal_type;
+        }
     }
     if input_ports[1] && y + 1 < MAP_SIZE.0 {
-        signal = cmp::max(prev_output_signal(&map[x][y + 1], 3), signal);
+        let (curr_signal, curr_signal_type) = prev_output_signal(&map[x][y + 1], 3);
+        if curr_signal > signal {
+            signal = curr_signal;
+            signal_type = curr_signal_type;
+        }
     }
     if input_ports[2] && x + 1 < MAP_SIZE.1 {
-        signal = cmp::max(prev_output_signal(&map[x + 1][y], 0), signal);
+        let (curr_signal, curr_signal_type) = prev_output_signal(&map[x + 1][y], 0);
+        if curr_signal > signal {
+            signal = curr_signal;
+            signal_type = curr_signal_type;
+        }
     }
     if input_ports[3] && y > 0 {
-        signal = cmp::max(prev_output_signal(&map[x][y - 1], 0), signal);
+        let (curr_signal, curr_signal_type) = prev_output_signal(&map[x][y - 1], 0);
+        if curr_signal > signal {
+            signal = curr_signal;
+            signal_type = curr_signal_type;
+        }
     }
 
-    signal - 1
+    (signal - 1, signal_type)
 }
 
 pub fn orient_port(orientation: Orientation, ports: Ports) -> Ports {

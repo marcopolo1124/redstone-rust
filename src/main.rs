@@ -1,7 +1,7 @@
 pub mod block;
 pub use block::*;
 
-pub const MAP_SIZE: (usize, usize) = (3, 3);
+pub const MAP_SIZE: (usize, usize) = (3, 10);
 pub type Map = [[Option<Block>; MAP_SIZE.0]; MAP_SIZE.1];
 
 fn translate_map(map: &Map) -> [[u8; MAP_SIZE.0]; MAP_SIZE.1] {
@@ -25,7 +25,6 @@ fn main() {
     let mut redstone_listener: Listener = vec![];
     let mut redstone_source_listener: Listener = vec![];
     let mut mechanism_listener: Listener = vec![];
-    let mut redstone_was_off: bool = false;
 
     let dirt = Block {
         texture_name: TextureName::Dirt,
@@ -67,12 +66,12 @@ fn main() {
             &mut map,
             &mut redstone_listener,
             &mut redstone_source_listener,
-            &mut mechanism_listener,
-            &mut redstone_was_off
+            &mut mechanism_listener
         )
     };
 
     place(&redstone_torch, 1, 1, Orientation::Up);
+    // place(&dirt, 1, 2, Orientation::Up);
 
     for x in 0..MAP_SIZE.1 {
         for y in 0..MAP_SIZE.0 {
@@ -84,5 +83,11 @@ fn main() {
     for row in signal_array {
         println!("{:?}", row);
     }
-    println!("{redstone_was_off}")
+
+    destroy(&mut map, 1, 1);
+    let signal_array = translate_map(&map);
+    println!("\n");
+    for row in signal_array {
+        println!("{:?}", row);
+    }
 }

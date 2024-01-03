@@ -29,7 +29,6 @@ pub fn place(
     redstone_listener: &mut Listener,
     redstone_source_listener: &mut Listener,
     mechanism_listener: &mut Listener,
-    redstone_was_off: &mut bool
 ) {
     if map[x][y] != None {
         return;
@@ -48,17 +47,45 @@ pub fn place(
                 output_ports
             );
             map[x][y] = Some(Block { kind: BlockKind::Redstone(redstone), orientation: facing, ..*blk });
-            let prev_signal = get_prev_signal(map, x, y, redstone.input_ports);
-            set_power(map, x, y, prev_signal, redstone_was_off);
+            let (prev_signal, signal_type) = get_prev_signal(map, x, y, redstone.input_ports);
+            set_power(map, x, y, prev_signal, signal_type);
         }
         BlockKind::Mechanism { kind } => {
             let mechanism = place_mechanism(map, mechanism_listener, x, y, facing, kind);
             map[x][y] = Some(Block { kind: mechanism, orientation: facing, ..*blk });
         }
         BlockKind::Transparent => map[x][y] = Some(Block { orientation: facing, ..*blk }),
-        BlockKind::Opaque { .. } => map[x][y] = Some(Block { orientation: facing, ..*blk }),
+        BlockKind::Opaque { .. } => {
+            map[x][y] = Some(Block { orientation: facing, ..*blk });
+            let (prev_signal, signal_type) = get_prev_signal(map, x, y, [true, true, true, true]);
+            set_power(map, x, y, prev_signal, signal_type)
+        }
     };
 }
+
+
+pub fn destroy(map: &mut Map, x: usize, y: usize){
+    let blk = &map[x][y];
+    match *blk{
+        Some(Block{kind, ..}) => {
+            match kind {
+                BlockKind::Redstone(Redstone { signal, output_ports, kind, .. }) => {
+                    let next_blocks = get_next(&map, x, y, output_ports);
+                    let signal_type = Some(get_signal_type(kind));
+                    map[x][y] = None;
+                    for (next_x, next_y) in next_blocks{
+                        set_power_to_0(map, next_x, next_y, signal_type, signal)
+                    }
+                },
+                _ => map[x][y] = None
+            }
+        },
+
+        _ => return
+    }
+
+}
+
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum BlockKind {
