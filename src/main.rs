@@ -33,7 +33,7 @@ fn main() {
     let mut redstone_block_off_delay: HashSet<(usize, usize)> = HashSet::new();
     let mut mechanism_listener: Listener = vec![];
 
-    let _dirt = Block {
+    let dirt = Block {
         texture_name: TextureName::Dirt,
         movable: true,
         orientation: Orientation::Up,
@@ -69,7 +69,7 @@ fn main() {
     };
 
     place(&redstone_torch, 1, 1, Orientation::Up);
-    // place(&dirt, 1, 2, Orientation::Up);
+    place(&dirt, 1, 2, Orientation::Up);
 
     for x in 0..MAP_SIZE.1 {
         for y in 0..MAP_SIZE.0 {

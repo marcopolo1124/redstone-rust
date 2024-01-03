@@ -50,9 +50,10 @@ fn get_power_update_value(kind: RedstoneKind, current_signal: u8, signal: u8) ->
         RedstoneKind::Torch => {
             // println!("torch found, input signal is {signal}");
             if signal == 0 {
-                println!("setting signal to 16");
                 16
-            } else { current_signal }
+            } else {
+                current_signal
+            }
         }
         RedstoneKind::Repeater => current_signal,
     }
@@ -140,8 +141,6 @@ pub fn set_power(
     signal_type: Option<SignalType>,
     redstone_block_off_delay: &mut HashSet<(usize, usize)>
 ) {
-
-
     let blk: &mut Option<Block> = &mut map[x][y];
     let (updated, signal, output_ports, signal_type) = match *blk {
         Some(
@@ -155,10 +154,9 @@ pub fn set_power(
             *signal = update_value;
             match kind {
                 RedstoneKind::Torch => {
-                    if input_signal > 0{
+                    if input_signal > 0 {
                         redstone_block_off_delay.insert((x, y));
                     }
-                    
                 }
                 _ => (),
             }
