@@ -4,14 +4,17 @@ use std::cmp;
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum RedstoneKind {
     Torch,
-    Repeater,
+    Repeater {
+        tick: i16,
+        countdown: i16,
+    },
     Block,
 }
 
 pub fn get_signal_type(kind: RedstoneKind) -> SignalType {
     match kind {
-        RedstoneKind::Torch | RedstoneKind::Repeater => SignalType::Strong,
-        RedstoneKind::Block => SignalType::Weak,
+        RedstoneKind::Torch | RedstoneKind::Repeater { .. } => SignalType::Strong(true),
+        RedstoneKind::Block => SignalType::Weak(true),
     }
 }
 
@@ -25,8 +28,8 @@ pub struct Redstone {
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum SignalType {
-    Weak,
-    Strong,
+    Weak(bool),
+    Strong(bool),
 }
 
 pub fn place_redstone(
@@ -44,17 +47,15 @@ pub fn place_redstone(
     }
 }
 
-fn get_power_update_value(kind: RedstoneKind, current_signal: u8, signal: u8) -> u8 {
+fn get_power_on_update_value(kind: RedstoneKind, current_signal: u8, signal: u8) -> u8 {
     match kind {
         RedstoneKind::Block => cmp::max(current_signal, signal),
         RedstoneKind::Torch => {
-            if signal == 0 {
-                16
-            } else {
-                current_signal
-            }
+            if signal == 0 { 16 } else { current_signal }
         }
-        RedstoneKind::Repeater => current_signal,
+        RedstoneKind::Repeater { countdown, .. } => {
+            if countdown == 0 && signal > 0 { 16 } else { current_signal }
+        }
     }
 }
 
@@ -65,45 +66,87 @@ pub fn set_power_to_0(
     signal_type: Option<SignalType>,
     prev_signal: u8,
     redstone_block_on_delay: &mut HashSet<(usize, usize)>,
-    redstone_block_off_delay: &mut HashSet<(usize, usize)>
+    redstone_block_off_delay: &mut HashSet<(usize, usize)>,
+    mechanism_on: &mut HashSet<(usize, usize)>,
+    mechanism_off: &mut HashSet<(usize, usize)>,
+    repeater_on_listener: &mut HashSet<(usize, usize)>,
+    repeater_off_listener: &mut HashSet<(usize, usize)>
 ) {
     let blk: &mut Option<Block> = &mut map[x][y];
     let (output_ports, input_ports, curr_signal, signal_type) = match *blk {
         Some(
             Block {
                 kind: BlockKind::Redstone(
-                    Redstone { ref mut signal, kind, output_ports, input_ports, .. },
+                    Redstone { ref mut signal, ref mut kind, output_ports, input_ports, .. },
                 ),
                 ..
             },
         ) => {
-            let curr_signal = *signal;
-            if prev_signal > curr_signal {
-                *signal = 0;
-            }
-            match kind {
-                RedstoneKind::Torch => {
-                    redstone_block_on_delay.insert((x, y));
+            match signal_type {
+                Some(SignalType::Strong(_)) | Some(SignalType::Weak(true)) | None => {
+                    let curr_signal = *signal;
+
+                    match *kind {
+                        RedstoneKind::Torch => {
+                            if prev_signal < 20 {
+                                redstone_block_on_delay.insert((x, y));
+                            }
+                            *signal = 0;
+                        }
+                        RedstoneKind::Repeater { tick, ref mut countdown } => {
+                            if *countdown == -1 && curr_signal > 0 {
+                                repeater_off_listener.insert((x, y));
+                                *countdown = tick;
+                            } else if *countdown == 0 && curr_signal > 0 {
+                                *signal = 0;
+                            }
+                        }
+                        _ => {
+                            if prev_signal > curr_signal {
+                                *signal = 0;
+                            }
+                        }
+                    }
+                    (output_ports, input_ports, curr_signal, Some(get_signal_type(*kind)))
                 }
-                _ => (),
+                _ => ([false, false, false, false], [false, false, false, false], 0, None),
             }
-            (output_ports, input_ports, curr_signal, Some(get_signal_type(kind)))
         }
         Some(
             Block { kind: BlockKind::Opaque { ref mut strong_signal, ref mut weak_signal }, .. },
         ) => {
             match signal_type {
-                Some(SignalType::Weak) => {
-                    *weak_signal = 0;
-                    ([false, false, false, false], [false, false, false, false], 0, None)
+                Some(SignalType::Weak(true)) => {
+                    // println!("I've been set to 0");
+                    let curr_signal = *weak_signal;
+                    if prev_signal > curr_signal {
+                        *weak_signal = 0;
+                    }
+                    (
+                        [true, true, true, true],
+                        [true, true, true, true],
+                        curr_signal,
+                        Some(SignalType::Weak(false)),
+                    )
                 }
-                Some(SignalType::Strong) => {
+                Some(SignalType::Strong(true)) => {
                     let curr_signal = *strong_signal;
-                    *strong_signal = 0;
-                    ([true, true, true, true], [true, true, true, true], curr_signal, None)
+                    if prev_signal > curr_signal {
+                        *strong_signal = 0;
+                    }
+                    (
+                        [true, true, true, true],
+                        [true, true, true, true],
+                        curr_signal,
+                        Some(SignalType::Strong(false)),
+                    )
                 }
                 _ => ([false, false, false, false], [false, false, false, false], 0, None),
             }
+        }
+        Some(Block { kind: BlockKind::Mechanism { .. }, .. }) => {
+            mechanism_off.insert((x, y));
+            ([false, false, false, false], [false, false, false, false], 0, None)
         }
 
         _ => ([false, false, false, false], [false, false, false, false], 0, None),
@@ -122,13 +165,30 @@ pub fn set_power_to_0(
             signal_type,
             curr_signal,
             redstone_block_on_delay,
-            redstone_block_off_delay
+            redstone_block_off_delay,
+            mechanism_on,
+            mechanism_off,
+            repeater_on_listener,
+            repeater_off_listener
         );
     }
 
     let (prev_signal, signal_type) = get_prev_signal(map, x, y, input_ports);
+    // println!("set power after 0 propagation");
+    // if x == 1 && y == 2 {
+    //     println!("at 1, 2, the prev signal is {prev_signal}, {:?}", signal_type);
+    // }
     if prev_signal + 1 >= curr_signal {
-        set_power(map, x, y, prev_signal, signal_type, redstone_block_off_delay);
+        set_power(
+            map,
+            x,
+            y,
+            prev_signal,
+            signal_type,
+            redstone_block_off_delay,
+            mechanism_off,
+            repeater_on_listener
+        );
     }
 }
 
@@ -138,43 +198,63 @@ pub fn set_power(
     y: usize,
     input_signal: u8,
     signal_type: Option<SignalType>,
-    redstone_block_off_delay: &mut HashSet<(usize, usize)>
+    redstone_block_off_delay: &mut HashSet<(usize, usize)>,
+    mechanism_on: &mut HashSet<(usize, usize)>,
+    repeater_on_listener: &mut HashSet<(usize, usize)>
 ) {
     let blk: &mut Option<Block> = &mut map[x][y];
     let (updated, signal, output_ports, signal_type) = match *blk {
         Some(
             Block {
-                kind: BlockKind::Redstone(Redstone { ref mut signal, kind, output_ports, .. }),
+                kind: BlockKind::Redstone(
+                    Redstone { ref mut signal, ref mut kind, output_ports, .. },
+                ),
                 ..
             },
         ) => {
-            let update_value = get_power_update_value(kind, *signal, input_signal);
-            let updated = *signal < update_value;
-            *signal = update_value;
-            match kind {
-                RedstoneKind::Torch => {
-                    if input_signal > 0 {
-                        redstone_block_off_delay.insert((x, y));
+            match signal_type {
+                Some(SignalType::Strong(_)) | Some(SignalType::Weak(true)) | None => {
+                    let update_value = get_power_on_update_value(*kind, *signal, input_signal);
+                    let updated = *signal < update_value;
+                    *signal = update_value;
+                    match *kind {
+                        RedstoneKind::Torch => {
+                            if input_signal > 0 {
+                                redstone_block_off_delay.insert((x, y));
+                            }
+                        }
+                        RedstoneKind::Repeater { tick, ref mut countdown } => {
+                            if *countdown == -1 && input_signal > 0 {
+                                repeater_on_listener.insert((x, y));
+                                *countdown = tick;
+                            }
+                        }
+                        _ => (),
                     }
+                    (updated, *signal, output_ports, Some(get_signal_type(*kind)))
                 }
-                _ => (),
+                _ => (false, 0, [false, false, false, false], None),
             }
-            (updated, *signal, output_ports, Some(get_signal_type(kind)))
         }
         Some(
             Block { kind: BlockKind::Opaque { ref mut strong_signal, ref mut weak_signal }, .. },
         ) => {
             match signal_type {
-                Some(SignalType::Strong) => {
-                    *strong_signal = input_signal;
-                    (true, input_signal, [true, true, true, true], None)
+                Some(SignalType::Strong(true)) => {
+                    *strong_signal = cmp::max(input_signal, *strong_signal);
+                    (true, input_signal, [true, true, true, true], Some(SignalType::Strong(false)))
                 }
-                Some(SignalType::Weak) => {
-                    *weak_signal = input_signal;
-                    (false, 0, [false, false, false, false], None)
+                Some(SignalType::Weak(true)) => {
+                    // println!("weak signal {input_signal}, {weak_signal} {strong_signal}");
+                    *weak_signal = cmp::max(input_signal, *weak_signal);
+                    (true, input_signal, [true, true, true, true], Some(SignalType::Weak(false)))
                 }
-                None => (false, 0, [false, false, false, false], None),
+                _ => (false, 0, [false, false, false, false], None),
             }
+        }
+        Some(Block { kind: BlockKind::Mechanism { .. }, .. }) => {
+            mechanism_on.insert((x, y));
+            (false, 0, [false, false, false, false], None)
         }
 
         _ => (false, 0, [false, false, false, false], None),
@@ -187,7 +267,16 @@ pub fn set_power(
     if updated {
         let next_blocks = get_next(map, x, y, output_ports);
         for (next_x, next_y) in next_blocks {
-            set_power(map, next_x, next_y, signal - 1, signal_type, redstone_block_off_delay);
+            set_power(
+                map,
+                next_x,
+                next_y,
+                signal - 1,
+                signal_type,
+                redstone_block_off_delay,
+                mechanism_on,
+                repeater_on_listener
+            );
         }
     }
 }
@@ -198,6 +287,10 @@ fn required_input_port(blk: &Option<Block>, ind: usize) -> bool {
             input_ports[ind]
         }
         Some(Block { kind: BlockKind::Opaque { .. }, .. }) => true,
+        Some(Block { kind: BlockKind::Mechanism { .. }, .. }) => {
+            let input_ports = [false, true, true, true];
+            input_ports[ind]
+        }
         _ => false,
     }
 }
@@ -227,9 +320,7 @@ fn prev_output_signal(blk: &Option<Block>, ind: usize) -> (u8, Option<SignalType
         ) => {
             if output_ports[ind] { (signal, Some(get_signal_type(kind))) } else { (0, None) }
         }
-        Some(
-            Block {kind: BlockKind::Opaque { strong_signal, .. }, ..}
-        ) => {
+        Some(Block { kind: BlockKind::Opaque { strong_signal, .. }, .. }) => {
             (strong_signal, None)
         }
         _ => (0, None),

@@ -5,7 +5,7 @@ pub use redstone::*;
 pub use mechanism::*;
 pub use super::*;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Component)]
 pub struct Block {
     pub movable: bool,
     pub texture_name: TextureName,
@@ -18,6 +18,11 @@ pub enum TextureName {
     Dirt,
     RedstoneTorch(bool),
     RedstoneDust(bool),
+    Piston{extended: bool},
+    StickyPiston{extended: bool},
+    PistonHead,
+    StickyPistonHead,
+    Repeater{tick: u8, on: bool},
 }
 
 pub fn place(
@@ -27,7 +32,8 @@ pub fn place(
     facing: Orientation,
     map: &mut Map,
     redstone_block_off_delay: &mut HashSet<(usize, usize)>,
-    mechanism_listener: &mut Listener
+    mechanism_on: &mut HashSet<(usize, usize)>,
+    repeater_on_listener:&mut HashSet<(usize, usize)>
 ) {
     if map[x][y] != None {
         return;
@@ -41,11 +47,10 @@ pub fn place(
                 ..*blk
             });
             let (prev_signal, signal_type) = get_prev_signal(map, x, y, redstone.input_ports);
-            set_power(map, x, y, prev_signal, signal_type, redstone_block_off_delay);
+            set_power(map, x, y, prev_signal, signal_type, redstone_block_off_delay, mechanism_on, repeater_on_listener);
         }
         BlockKind::Mechanism { kind } => {
-            let mechanism = place_mechanism(map, mechanism_listener, x, y, facing, kind);
-            map[x][y] = Some(Block { kind: mechanism, orientation: facing, ..*blk });
+            map[x][y] = Some(Block { kind: BlockKind::Mechanism { kind }, orientation: facing, ..*blk });
         }
         BlockKind::Transparent => {
             map[x][y] = Some(Block { orientation: facing, ..*blk });
@@ -53,7 +58,8 @@ pub fn place(
         BlockKind::Opaque { .. } => {
             map[x][y] = Some(Block { orientation: facing, ..*blk });
             let (prev_signal, signal_type) = get_prev_signal(map, x, y, [true, true, true, true]);
-            set_power(map, x, y, prev_signal, signal_type, redstone_block_off_delay)
+            // println!("prev {prev_signal} type, {:?}", signal_type);
+            set_power(map, x, y, prev_signal, signal_type, redstone_block_off_delay, mechanism_on, repeater_on_listener)
         }
     };
 }
@@ -63,7 +69,11 @@ pub fn destroy(
     x: usize,
     y: usize,
     redstone_block_off_delay: &mut HashSet<(usize, usize)>,
-    redstone_block_on_delay: &mut HashSet<(usize, usize)>
+    redstone_block_on_delay: &mut HashSet<(usize, usize)>,
+    mechanism_on: &mut HashSet<(usize, usize)>,
+    mechanism_off: &mut HashSet<(usize, usize)>,
+    repeater_on_listener:&mut HashSet<(usize, usize)>,
+    repeater_off_listner: &mut HashSet<(usize, usize)>
 ) {
     let blk = &map[x][y];
     match *blk {
@@ -81,7 +91,11 @@ pub fn destroy(
                             signal_type,
                             signal,
                             redstone_block_on_delay,
-                            redstone_block_off_delay
+                            redstone_block_off_delay,
+                            mechanism_on,
+                            mechanism_off,
+                            repeater_on_listener,
+                            repeater_off_listner
                         );
                     }
                 }
