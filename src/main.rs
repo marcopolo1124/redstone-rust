@@ -5,7 +5,7 @@ use std::f32::consts::PI;
 pub mod block;
 pub use block::*;
 
-pub const MAP_SIZE: (usize, usize) = (5, 5);
+pub const MAP_SIZE: (usize, usize) = (3, 3);
 pub type Map = [[Option<Block>; MAP_SIZE.0]; MAP_SIZE.1];
 
 pub use std::collections::HashSet;
@@ -60,7 +60,7 @@ const PISTON: Block = Block {
     kind: BlockKind::Mechanism { kind: MechanismKind::Piston },
 };
 
-const TICK: f64 = 1.0;
+const TICK: f64 = 0.02;
 
 pub fn debug_map(map: &Map) {
     for row in map {
@@ -277,6 +277,7 @@ fn mouse_input(
     if buttons.just_pressed(MouseButton::Right) && selected.0 != None {
         place(&selected.0.unwrap(), x, y, *orientation, map, &mut listeners);
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
+        println!("{:?}", map);
     }
 }
 

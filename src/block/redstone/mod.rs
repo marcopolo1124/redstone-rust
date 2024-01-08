@@ -411,7 +411,7 @@ pub fn get_prev_signal(
         }
     }
     if input_ports[3] && y > 0 {
-        let (curr_signal, curr_signal_type) = prev_output_signal(&map[x][y - 1], 0);
+        let (curr_signal, curr_signal_type) = prev_output_signal(&map[x][y - 1], 1);
         if curr_signal > signal {
             signal = curr_signal;
             signal_type = curr_signal_type;
