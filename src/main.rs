@@ -1,5 +1,3 @@
-
-use bevy::time::common_conditions::on_timer;
 use bevy::{ prelude::*, utils::HashMap, window::PrimaryWindow };
 use bevy::input::mouse::MouseWheel;
 
@@ -10,7 +8,6 @@ pub const MAP_SIZE: (usize, usize) = (5, 5);
 pub type Map = [[Option<Block>; MAP_SIZE.0]; MAP_SIZE.1];
 
 pub use std::collections::HashSet;
-use std::time::Duration;
 
 const DIRT: Block = Block {
     texture_name: TextureName::Dirt,
@@ -50,10 +47,10 @@ const PISTON: Block = Block {
     kind: BlockKind::Mechanism { kind: MechanismKind::Piston },
 };
 
-const TICK: f32 = 0.20;
+const TICK: f64 = 1.0;
 
 fn main() {
-    let world_map = [[Some(DIRT); MAP_SIZE.1]; MAP_SIZE.0];
+    let world_map = [[None; MAP_SIZE.1]; MAP_SIZE.0];
     let entity_map = [[None; MAP_SIZE.1]; MAP_SIZE.0];
     App::new()
         .insert_resource(WorldMap(world_map))
@@ -61,7 +58,7 @@ fn main() {
         .insert_resource(TextureMap(HashMap::new()))
         .insert_resource(EventListener::new())
         .insert_resource(SelectedBlock(None))
-        .insert_resource(Time::<Fixed>::from_seconds(0.5))
+        .insert_resource(Time::<Fixed>::from_seconds(TICK))
         .add_plugins(DefaultPlugins)
         .add_systems(Startup, load_assets)
         .add_systems(Startup, init)
@@ -163,8 +160,8 @@ pub fn get_sprite(
     let handle = textures.0.get(&texture).unwrap();
     SpriteBundle {
         transform: Transform::from_xyz(
-            BOX_WIDTH * y as f32,
-            BOX_WIDTH * (MAP_SIZE.1 - x - 1) as f32,
+            BOX_WIDTH * (y as f32),
+            BOX_WIDTH * ((MAP_SIZE.1 - x - 1) as f32),
             0.0
         ).with_scale(Vec3::splat(2.2)),
         texture: handle.clone(),
@@ -209,34 +206,12 @@ fn mouse_input(
     let ent_map = &mut entity_map.0;
     if buttons.just_pressed(MouseButton::Left) {
         // println!("{} {}", x, y);
-        let traversed = destroy(
-            map,
-            x,
-            y,
-            &mut listeners
-        );
+        destroy(map, x, y, &mut listeners);
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
-        for (x, y) in traversed {
-            update_entity_map(x, y, map, ent_map, &textures, &mut query);
-        }
-        // println!("destroy");
-        // println!("{:?}", map);
     }
     if buttons.just_pressed(MouseButton::Right) && selected.0 != None {
-        let traversed = place(
-            &selected.0.unwrap(),
-            x,
-            y,
-            Orientation::Up,
-            map,
-            &mut listeners
-        );
+        place(&selected.0.unwrap(), x, y, Orientation::Up, map, &mut listeners);
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
-        for (x, y) in traversed {
-            update_entity_map(x, y, map, ent_map, &textures, &mut query);
-        }
-        // println!("");
-        // println!("{:?}", map);
     }
 }
 
@@ -322,10 +297,7 @@ fn zoom_camera(
 }
 
 fn get_mouse_coord(x: f32, y: f32) -> Option<(usize, usize)> {
-    // // println!("{} {}", x, y);
-    // x = BOX_WIDTH * y_coord as f32,
-    // y = BOX_WIDTH * (MAP_SIZE.1 - x_coord - 1) as f32,
-    let x_coord = MAP_SIZE.1 as f32 - ((y + BOX_WIDTH / 2.0) / BOX_WIDTH).floor() - 1.0;
+    let x_coord = (MAP_SIZE.1 as f32) - ((y + BOX_WIDTH / 2.0) / BOX_WIDTH).floor() - 1.0;
     let y_coord = ((x + BOX_WIDTH / 2.0) / BOX_WIDTH).floor();
     if
         0.0 <= x_coord &&
@@ -339,61 +311,32 @@ fn get_mouse_coord(x: f32, y: f32) -> Option<(usize, usize)> {
     }
 }
 
-
 fn redstone_torch_delayed_listener(
     mut listeners: ResMut<EventListener>,
     mut world_map: ResMut<WorldMap>,
     mut entity_map: ResMut<EntityMap>,
     textures: Res<TextureMap>,
-    mut query: Query<(&mut BlockComponent, &mut Handle<Image>)>,
+    mut query: Query<(&mut BlockComponent, &mut Handle<Image>)>
 ) {
+    println!("start of listening");
     let mut traversed: HashSet<(usize, usize)> = HashSet::new();
-    let torch_off_listener = listeners.redstone_torch_off.clone();
-    listeners.redstone_torch_off.clear();
+    let torch_listeners = listeners.redstone_state.clone();
+    listeners.redstone_state.clear();
 
-    let torch_on_listener = listeners.redstone_torch_on.clone();
-    listeners.redstone_torch_on.clear();
-
-
-    for (x, y) in torch_off_listener {
-        set_power_to_0(
-            &mut world_map.0,
-            x,
-            y,
-            None,
-            20,
-            &mut listeners,
-            &mut traversed
-        );
-    }
-
-    for (x, y) in torch_on_listener {
-        set_power(
-            &mut world_map.0,
-            x,
-            y,
-            0,
-            None,
-            &mut listeners,
-            &mut traversed
-        );
-    }
-
-    println!("");
-    for row in world_map.0{
-        let mut new_row = Vec::new();
-        for element in row{
-            match element {
-                Some(Block{kind: BlockKind::Redstone(Redstone{signal, ..}), ..}) => {
-                    new_row.push((signal, 0));
-                },
-                Some(Block{kind: BlockKind::Opaque { strong_signal, weak_signal }, ..}) => {
-                    new_row.push((strong_signal, weak_signal))
-                },
-                _ => {new_row.push((0,0))}
-            }
+    for ((x, y), (on, signal, signal_type)) in torch_listeners {
+        if on {
+            set_power(&mut world_map.0, x, y, signal, signal_type, &mut listeners, &mut traversed);
+        } else {
+            set_power_to_0(
+                &mut world_map.0,
+                x,
+                y,
+                signal_type,
+                signal,
+                &mut listeners,
+                &mut traversed
+            );
         }
-        println!("{:?}", new_row);
     }
     for (x, y) in traversed {
         update_entity_map(x, y, &world_map.0, &mut entity_map.0, &textures, &mut query);

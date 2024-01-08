@@ -26,7 +26,7 @@ pub struct Redstone {
     pub kind: RedstoneKind,
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone, Eq, Hash)]
 pub enum SignalType {
     Weak(bool),
     Strong(bool),
@@ -88,7 +88,7 @@ pub fn set_power_to_0(
         ) => {
             match signal_type {
                 Some(SignalType::Weak(true)) => {
-                    // // println!("I've been set to 0");
+                    // println!("I've been set to 0");
                     let curr_signal = *weak_signal;
                     if prev_signal > curr_signal {
                         *weak_signal = 0;
@@ -143,6 +143,7 @@ pub fn set_power_to_0(
 
     let (prev_signal, signal_type) = get_prev_signal(map, x, y, input_ports);
     if prev_signal + 1 >= curr_signal {
+        println!("propagation attempt {:?}", map);
         set_power(map, x, y, prev_signal, signal_type, listeners, traversed);
     }
 }
@@ -240,8 +241,10 @@ fn update_redstone_signal(
                         *signal = 16;
                         *texture_name = TextureName::RedstoneTorch(true);
                         Some((16, output_ports, Some(SignalType::Strong(true))))
-                    } else if *signal > 0 && input_signal > 0 {
-                        listeners.redstone_torch_off.insert((x, y));
+                    } else if *signal > 0 {
+                        println!("offed");
+                        listeners.redstone_state.insert((x, y), (false, 20, None));
+
                         None
                     } else {
                         None
@@ -303,7 +306,8 @@ fn update_redstone_signal_to_0(
             match *kind {
                 RedstoneKind::Torch => {
                     if prev_signal < 20 {
-                        listeners.redstone_torch_on.insert((x, y));
+                        println!("oned");
+                        listeners.redstone_state.insert((x, y), (true, 0, None));
                     } else {
                         *texture_name = TextureName::RedstoneTorch(false);
                         *signal = 0;
