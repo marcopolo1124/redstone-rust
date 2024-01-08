@@ -88,7 +88,7 @@ pub fn set_power_to_0(
         ) => {
             match signal_type {
                 Some(SignalType::Weak(true)) => {
-                    // println!("I've been set to 0");
+                    //println!("I've been set to 0");
                     let curr_signal = *weak_signal;
                     if prev_signal > curr_signal {
                         *weak_signal = 0;
@@ -116,7 +116,7 @@ pub fn set_power_to_0(
             }
         }
         Some(Block { kind: BlockKind::Mechanism { .. }, .. }) => {
-            listeners.mechanism_off.insert((x, y));
+            listeners.mechanism_state.insert((x, y), false);
             None
         }
 
@@ -143,7 +143,7 @@ pub fn set_power_to_0(
 
     let (prev_signal, signal_type) = get_prev_signal(map, x, y, input_ports);
     if prev_signal + 1 >= curr_signal {
-        // println!("propagation attempt");
+        //println!("propagation attempt");
         // debug_map(map);
         set_power(map, x, y, prev_signal, signal_type, listeners, traversed);
     }
@@ -158,7 +158,7 @@ pub fn set_power(
     listeners: &mut EventListener,
     traversed: &mut HashSet<(usize, usize)>
 ) {
-    // println!("current {x} {y}");
+    //println!("current {x} {y}");
     let blk: &mut Option<Block> = &mut map[x][y];
     let values = match *blk {
         Some(
@@ -185,7 +185,7 @@ pub fn set_power(
         Some(
             Block { kind: BlockKind::Opaque { ref mut strong_signal, ref mut weak_signal }, .. },
         ) => {
-            // println!("{:?}", signal_type);
+            //println!("{:?}", signal_type);
             match signal_type {
                 Some(SignalType::Strong(true)) => {
                     *strong_signal = cmp::max(input_signal, *strong_signal);
@@ -199,7 +199,7 @@ pub fn set_power(
             }
         }
         Some(Block { kind: BlockKind::Mechanism { .. }, .. }) => {
-            listeners.mechanism_on.insert((x, y));
+            listeners.mechanism_state.insert((x, y), true);
             None
         }
 
@@ -233,7 +233,7 @@ fn update_redstone_signal(
     y: usize,
     texture_name: &mut TextureName
 ) -> Option<(u8, Ports, Option<SignalType>)> {
-    // println!("fuffuufufuf {input_signal}");
+    //println!("fuffuufufuf {input_signal}");
     match signal_type {
         Some(SignalType::Strong(_)) | Some(SignalType::Weak(true)) | None => {
             match *kind {
@@ -307,10 +307,10 @@ fn update_redstone_signal_to_0(
                 }
                 RedstoneKind::Repeater { .. } => {
                     if prev_signal < 20 {
-                        println!("fucked up");
+                        //println!("fucked up");
                         listeners.repeater_state.insert((x, y), false);
                     } else {
-                        println!("mega offed");
+                        //println!("mega offed");
                         *signal = 0;
                         *texture_name = TextureName::Repeater(false);
                     }
@@ -366,7 +366,7 @@ fn prev_output_signal(blk: &Option<Block>, ind: usize) -> (u8, Option<SignalType
             Block { kind: BlockKind::Redstone(Redstone { output_ports, signal, kind, .. }), .. },
         ) => {
             let signal_type = Some(get_signal_type(kind));
-            // println!("output_ports ind {} {signal}, {:?} ", output_ports[ind], signal_type);
+            //println!("output_ports ind {} {signal}, {:?} ", output_ports[ind], signal_type);
             if output_ports[ind] {
                 (signal, signal_type)
             } else {

@@ -21,8 +21,7 @@ pub type Listener = HashSet<(usize, usize)>;
 pub struct EventListener {
     pub redstone_state: HashMap<(usize, usize), (bool, u8, Option<SignalType>)>,
     pub repeater_state: HashMap<(usize, usize), bool>,
-    pub mechanism_on: Listener,
-    pub mechanism_off: Listener,
+    pub mechanism_state: HashMap<(usize, usize), bool>
 }
 
 impl EventListener {
@@ -30,8 +29,7 @@ impl EventListener {
         EventListener {
             redstone_state: HashMap::new(),
             repeater_state: HashMap::new(),
-            mechanism_off: HashSet::new(),
-            mechanism_on: HashSet::new(),
+            mechanism_state: HashMap::new(),
         }
     }
 }
@@ -57,8 +55,8 @@ pub fn place(
                 ..*blk
             });
             let (prev_signal, signal_type) = get_prev_signal(map, x, y, redstone.input_ports);
-            println!("{prev_signal} {:?}", signal_type);
-            // println!("{prev_signal} {:?}", signal_type);
+            //println!("{prev_signal} {:?}", signal_type);
+            //println!("{prev_signal} {:?}", signal_type);
             // set_power(map, x, y, prev_signal, signal_type, listeners, &mut traversed);
             listeners.redstone_state.insert((x, y), (true, prev_signal, signal_type));
         }
@@ -75,7 +73,7 @@ pub fn place(
         BlockKind::Opaque { .. } => {
             map[x][y] = Some(Block { orientation: facing, ..*blk });
             let (prev_signal, signal_type) = get_prev_signal(map, x, y, [true, true, true, true]);
-            // println!("prev {prev_signal} type, {:?}", signal_type);
+            //println!("prev {prev_signal} type, {:?}", signal_type);
             listeners.redstone_state.insert((x, y), (true, prev_signal, signal_type));
         }
     }

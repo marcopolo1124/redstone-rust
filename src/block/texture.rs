@@ -31,7 +31,7 @@ pub fn get_texture_name(texture: TextureName) -> String {
         TextureName::Piston { extended } | TextureName::StickyPiston { extended } => if extended {
             "piston_extended_base.png"
         } else {
-            "piston_top.opng"
+            "piston_side.png"
         }
         TextureName::PistonHead | TextureName::StickyPistonHead => "piston_extension.png",
         TextureName::Repeater(on) => if on {

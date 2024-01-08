@@ -60,6 +60,20 @@ const PISTON: Block = Block {
     kind: BlockKind::Mechanism { kind: MechanismKind::Piston },
 };
 
+const EXTENDED_PISTON: Block = Block {
+    movable: false,
+    texture_name: TextureName::Piston {extended: true},
+    orientation: Orientation::Up,
+    kind: BlockKind::Mechanism { kind: MechanismKind::ExtendedPiston }
+};
+
+const PISTON_HEAD: Block = Block {
+    movable: false,
+    texture_name: TextureName::PistonHead,
+    orientation: Orientation::Up,
+    kind: BlockKind::Transparent
+};
+
 const TICK: f64 = 0.02;
 
 pub fn debug_map(map: &Map) {
@@ -78,7 +92,7 @@ pub fn debug_map(map: &Map) {
                 }
             }
         }
-        println!("{:?}", new_row);
+        //println!("{:?}", new_row);
     }
 }
 
@@ -156,6 +170,8 @@ pub fn update_selected_block(
         selected.0 = Some(REDSTONE_TORCH);
     } else if keyboard_input.pressed(KeyCode::Key4) {
         selected.0 = Some(REPEATER);
+    } else if keyboard_input.pressed(KeyCode::Key5){
+        selected.0 = Some(PISTON);
     }
 }
 
@@ -270,14 +286,14 @@ fn mouse_input(
     let map = &mut world_map.0;
     let ent_map = &mut entity_map.0;
     if buttons.just_pressed(MouseButton::Left) {
-        // println!("{} {}", x, y);
+        //println!("{} {}", x, y);
         destroy(map, x, y, &mut listeners);
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
     }
     if buttons.just_pressed(MouseButton::Right) && selected.0 != None {
         place(&selected.0.unwrap(), x, y, *orientation, map, &mut listeners);
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
-        println!("{:?}", map);
+        //println!("{:?}", map);
     }
 }
 
@@ -311,7 +327,19 @@ fn load_assets(asset_server: Res<AssetServer>, mut textures: ResMut<TextureMap>)
         TextureName::Repeater(true),
         asset_server.load(get_texture_path(TextureName::Repeater(true)))
     );
+    assets.insert(
+        TextureName::Piston { extended: false },
+        asset_server.load(get_texture_path(TextureName::Piston { extended: false }))
+    );
+    assets.insert(
+        TextureName::Piston { extended: true },
+        asset_server.load(get_texture_path(TextureName::Piston { extended: true }))
+    );
 
+    assets.insert(
+        TextureName::PistonHead,
+        asset_server.load(get_texture_path(TextureName::PistonHead))
+    );
     assets.insert(TextureName::Air, asset_server.load(get_texture_path(TextureName::Air)));
 }
 
@@ -393,7 +421,7 @@ fn redstone_torch_delayed_listener(
     textures: Res<TextureMap>,
     mut query: Query<(&mut Transform, &mut BlockComponent, &mut Handle<Image>)>
 ) {
-    // println!("start of listening");
+    //println!("start of listening");
     let mut traversed: HashSet<(usize, usize)> = HashSet::new();
     let torch_listeners = listeners.redstone_state.clone();
     listeners.redstone_state.clear();
@@ -427,7 +455,7 @@ pub fn repeater_listener(
 ) {
     let mut traversed: HashSet<(usize, usize)> = HashSet::new();
     let repeater_listeners = listeners.repeater_state.clone();
-    println!("{:?}", repeater_listeners);
+    //println!("{:?}", repeater_listeners);
 
     for ((x, y), on) in repeater_listeners {
         let blk = &mut world_map.0[x][y];
@@ -457,7 +485,7 @@ pub fn repeater_listener(
                         listeners.repeater_state.remove(&(x, y));
                     }
                 } else {
-                    println!("offing {} {}", *countdown, signal);
+                    //println!("offing {} {}", *countdown, signal);
                     if *countdown < 0 && signal > 0 {
                         *countdown = tick;
                     }
@@ -476,7 +504,7 @@ pub fn repeater_listener(
                             &mut traversed
                         );
                         listeners.repeater_state.remove(&(x, y));
-                        println!("removed");
+                        //println!("removed");
                     }
                 }
             }
