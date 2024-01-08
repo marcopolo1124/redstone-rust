@@ -5,7 +5,7 @@ use std::cmp;
 pub enum RedstoneKind {
     Torch,
     Repeater {
-        tick: u8,
+        tick: i16,
         countdown: i16,
     },
     Block,
@@ -143,8 +143,8 @@ pub fn set_power_to_0(
 
     let (prev_signal, signal_type) = get_prev_signal(map, x, y, input_ports);
     if prev_signal + 1 >= curr_signal {
-        println!("propagation attempt");
-        debug_map(map);
+        // println!("propagation attempt");
+        // debug_map(map);
         set_power(map, x, y, prev_signal, signal_type, listeners, traversed);
     }
 }
@@ -247,18 +247,14 @@ fn update_redstone_signal(
                         None
                     }
                 }
-                RedstoneKind::Repeater { tick, ref mut countdown } => {
-                    if *countdown == -1 && input_signal > 0 {
-                        listeners.repeater_on.insert((x, y));
-                        *countdown = tick as i16;
-                        None
-                    } else if *countdown > 0 && input_signal > 0 {
-                        *countdown -= 1;
-                        None
-                    } else if *countdown == 0 && input_signal > 0 {
+                RedstoneKind::Repeater { .. } => {
+                    if input_signal >= 20{
                         *signal = 16;
-                        *texture_name = TextureName::Repeater { tick, on: true };
-                        Some((input_signal, output_ports, Some(SignalType::Strong(true))))
+                        *texture_name = TextureName::Repeater(true);
+                        Some((16, output_ports, Some(SignalType::Strong(true))))
+                    } else if input_signal > 0{
+                        listeners.repeater_state.insert((x, y), true);
+                        None
                     } else {
                         None
                     }
@@ -303,20 +299,20 @@ fn update_redstone_signal_to_0(
             match *kind {
                 RedstoneKind::Torch => {
                     if prev_signal < 20 {
-                        println!("oned");
                         listeners.redstone_state.insert((x, y), (true, 0, None));
                     } else {
                         *texture_name = TextureName::RedstoneTorch(false);
                         *signal = 0;
                     }
                 }
-                RedstoneKind::Repeater { tick, ref mut countdown } => {
-                    if *countdown == -1 && curr_signal > 0 {
-                        listeners.repeater_off.insert((x, y));
-                        *countdown = tick as i16;
-                    } else if *countdown == 0 && curr_signal > 0 {
+                RedstoneKind::Repeater { tick, .. } => {
+                    if prev_signal < 20 {
+                        println!("fucked up");
+                        listeners.repeater_state.insert((x, y), false);
+                    } else {
+                        println!("mega offed");
                         *signal = 0;
-                        *texture_name = TextureName::Repeater { tick, on: false };
+                        *texture_name = TextureName::Repeater(false);
                     }
                 }
                 RedstoneKind::Block => {

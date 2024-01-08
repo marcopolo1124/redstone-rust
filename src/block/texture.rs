@@ -11,10 +11,7 @@ pub enum TextureName {
     },
     PistonHead,
     StickyPistonHead,
-    Repeater {
-        tick: u8,
-        on: bool,
-    },
+    Repeater(bool),
     Air,
 }
 
@@ -37,7 +34,7 @@ pub fn get_texture_name(texture: TextureName) -> String {
             "piston_top.opng"
         }
         TextureName::PistonHead | TextureName::StickyPistonHead => "piston_extension.png",
-        TextureName::Repeater { on, .. } => if on {
+        TextureName::Repeater(on) => if on {
             "redstone_repeater_on.png"
         } else {
             "redstone_repeater_off.png"

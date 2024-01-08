@@ -40,6 +40,18 @@ const REDSTONE_TORCH: Block = Block {
     }),
 };
 
+const REPEATER: Block = Block{
+    movable: false,
+    texture_name: TextureName::Repeater(false),
+    orientation: Orientation::Up,
+    kind: BlockKind::Redstone(Redstone {
+        signal: 0,
+        input_ports: [false, false, true, false],
+        output_ports: [true, false, false, false],
+        kind: RedstoneKind::Repeater { tick: 5, countdown: -1 }
+    })
+};
+
 const PISTON: Block = Block {
     movable: true,
     texture_name: TextureName::Piston { extended: false },
@@ -49,22 +61,21 @@ const PISTON: Block = Block {
 
 const TICK: f64 = 1.0;
 
-pub fn debug_map(map: &Map){
-    for row in map{
+pub fn debug_map(map: &Map) {
+    for row in map {
         let mut new_row = Vec::new();
         for blk in row {
             match *blk {
-                Some(Block{kind: BlockKind::Redstone(Redstone{signal, ..}), ..}) => {
+                Some(Block { kind: BlockKind::Redstone(Redstone { signal, .. }), .. }) => {
                     new_row.push((signal, 0));
-                },
-                Some(Block{kind: BlockKind::Opaque { strong_signal, weak_signal }, ..}) => {
+                }
+                Some(Block { kind: BlockKind::Opaque { strong_signal, weak_signal }, .. }) => {
                     new_row.push((strong_signal, weak_signal));
                 }
                 _ => {
-                    new_row.push((0, 0))
+                    new_row.push((0, 0));
                 }
             }
-            
         }
         println!("{:?}", new_row);
     }
@@ -88,6 +99,7 @@ fn main() {
         .add_systems(Update, zoom_camera)
         .add_systems(Update, update_selected_block)
         .add_systems(FixedUpdate, redstone_torch_delayed_listener)
+        .add_systems(FixedUpdate, repeater_listener)
         .run();
 }
 
@@ -139,6 +151,8 @@ pub fn update_selected_block(
         selected.0 = Some(REDSTONE_DUST);
     } else if keyboard_input.pressed(KeyCode::Key3) {
         selected.0 = Some(REDSTONE_TORCH);
+    } else if keyboard_input.pressed(KeyCode::Key4) {
+        selected.0 = Some(REPEATER);
     }
 }
 
@@ -258,6 +272,15 @@ fn load_assets(asset_server: Res<AssetServer>, mut textures: ResMut<TextureMap>)
         TextureName::RedstoneTorch(true),
         asset_server.load(get_texture_path(TextureName::RedstoneTorch(true)))
     );
+    assets.insert(
+        TextureName::Repeater(false),
+        asset_server.load(get_texture_path(TextureName::Repeater(false)))
+    );
+    assets.insert(
+        TextureName::Repeater(true),
+        asset_server.load(get_texture_path(TextureName::Repeater(true)))
+    );
+
     assets.insert(TextureName::Air, asset_server.load(get_texture_path(TextureName::Air)));
 }
 
@@ -339,7 +362,7 @@ fn redstone_torch_delayed_listener(
     textures: Res<TextureMap>,
     mut query: Query<(&mut BlockComponent, &mut Handle<Image>)>
 ) {
-    println!("start of listening");
+    // println!("start of listening");
     let mut traversed: HashSet<(usize, usize)> = HashSet::new();
     let torch_listeners = listeners.redstone_state.clone();
     listeners.redstone_state.clear();
@@ -357,6 +380,70 @@ fn redstone_torch_delayed_listener(
                 &mut listeners,
                 &mut traversed
             );
+        }
+    }
+    for (x, y) in traversed {
+        update_entity_map(x, y, &world_map.0, &mut entity_map.0, &textures, &mut query);
+    }
+}
+
+pub fn repeater_listener(
+    mut listeners: ResMut<EventListener>,
+    mut world_map: ResMut<WorldMap>,
+    mut entity_map: ResMut<EntityMap>,
+    textures: Res<TextureMap>,
+    mut query: Query<(&mut BlockComponent, &mut Handle<Image>)>
+) {
+    let mut traversed: HashSet<(usize, usize)> = HashSet::new();
+    let repeater_listeners = listeners.repeater_state.clone();
+    println!("{:?}", repeater_listeners);
+
+    for ((x, y), on) in repeater_listeners {
+        let blk = &mut world_map.0[x][y];
+        match *blk {
+            Some(
+                Block {
+                    kind: BlockKind::Redstone(
+                        Redstone {
+                            kind: RedstoneKind::Repeater { tick, ref mut countdown },
+                            signal,
+                            ..
+                        },
+                    ),
+                    ..
+                },
+            ) => {
+                if on{
+                    if *countdown < 0 && signal <= 0{
+                        *countdown = tick;
+                    }
+
+                    *countdown -= 1;
+
+                    if *countdown <= 0 && signal <= 0{
+                        *countdown -= 1;
+                        set_power(&mut world_map.0, x, y, 20, None, &mut listeners, &mut traversed);
+                        listeners.repeater_state.remove(&(x, y));
+                    }
+
+                    
+                } else {
+                    println!("offing {} {}", *countdown, signal);
+                    if *countdown < 0 && signal > 0 {
+                        *countdown = tick;
+                    }
+
+                    *countdown -= 1;
+
+                    if *countdown <= 0 && signal > 0 {
+                        *countdown -= 1;
+                        set_power_to_0(&mut world_map.0, x, y, None, 30, &mut listeners, &mut traversed);
+                        listeners.repeater_state.remove(&(x, y));
+                        println!("removed")
+                    }
+                }
+            }
+            _ => {}
         }
     }
     for (x, y) in traversed {

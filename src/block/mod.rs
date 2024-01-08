@@ -20,8 +20,7 @@ pub type Listener = HashSet<(usize, usize)>;
 #[derive(Resource, Debug, Clone)]
 pub struct EventListener {
     pub redstone_state: HashMap<(usize, usize), (bool, u8, Option<SignalType>)>,
-    pub repeater_off: Listener,
-    pub repeater_on: Listener,
+    pub repeater_state: HashMap<(usize, usize), bool>,
     pub mechanism_on: Listener,
     pub mechanism_off: Listener,
 }
@@ -30,8 +29,7 @@ impl EventListener {
     pub fn new() -> EventListener {
         EventListener {
             redstone_state: HashMap::new(),
-            repeater_off: HashSet::new(),
-            repeater_on: HashSet::new(),
+            repeater_state: HashMap::new(),
             mechanism_off: HashSet::new(),
             mechanism_on: HashSet::new(),
         }
