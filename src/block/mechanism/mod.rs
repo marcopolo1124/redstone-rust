@@ -7,6 +7,3 @@ pub enum MechanismKind {
     StickyPiston,
     StickyExtendedPiston,
 }
-
-
-// pub fn move

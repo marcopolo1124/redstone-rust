@@ -1,11 +1,13 @@
 mod redstone;
 mod mechanism;
+mod texture;
 
 pub use redstone::*;
 pub use mechanism::*;
 pub use super::*;
+pub use texture::*;
 
-#[derive(Debug, PartialEq, Clone, Component)]
+#[derive(Debug, PartialEq, Clone, Copy, Component)]
 pub struct Block {
     pub movable: bool,
     pub texture_name: TextureName,
@@ -13,16 +15,29 @@ pub struct Block {
     pub kind: BlockKind,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum TextureName {
-    Dirt,
-    RedstoneTorch(bool),
-    RedstoneDust(bool),
-    Piston{extended: bool},
-    StickyPiston{extended: bool},
-    PistonHead,
-    StickyPistonHead,
-    Repeater{tick: u8, on: bool},
+pub type Listener = HashSet<(usize, usize)>;
+
+#[derive(Resource, Debug, Clone)]
+pub struct EventListener {
+    pub redstone_torch_off: Listener,
+    pub redstone_torch_on: Listener,
+    pub repeater_off: Listener,
+    pub repeater_on: Listener,
+    pub mechanism_on: Listener,
+    pub mechanism_off: Listener,
+}
+
+impl EventListener {
+    pub fn new() -> EventListener {
+        EventListener {
+            redstone_torch_off: HashSet::new(),
+            redstone_torch_on: HashSet::new(),
+            repeater_off: HashSet::new(),
+            repeater_on: HashSet::new(),
+            mechanism_off: HashSet::new(),
+            mechanism_on: HashSet::new(),
+        }
+    }
 }
 
 pub fn place(
@@ -31,13 +46,14 @@ pub fn place(
     y: usize,
     facing: Orientation,
     map: &mut Map,
-    redstone_block_off_delay: &mut HashSet<(usize, usize)>,
-    mechanism_on: &mut HashSet<(usize, usize)>,
-    repeater_on_listener:&mut HashSet<(usize, usize)>
-) {
+    listeners: &mut EventListener
+) -> HashSet<(usize, usize)> {
+    let mut traversed: HashSet<(usize, usize)> = HashSet::new();
+
     if map[x][y] != None {
-        return;
+        return traversed;
     }
+
     match blk.kind {
         BlockKind::Redstone(Redstone { signal, input_ports, output_ports, kind }) => {
             let redstone = place_redstone(signal, facing, kind, input_ports, output_ports);
@@ -47,10 +63,15 @@ pub fn place(
                 ..*blk
             });
             let (prev_signal, signal_type) = get_prev_signal(map, x, y, redstone.input_ports);
-            set_power(map, x, y, prev_signal, signal_type, redstone_block_off_delay, mechanism_on, repeater_on_listener);
+            // println!("{prev_signal} {:?}", signal_type);
+            set_power(map, x, y, prev_signal, signal_type, listeners, &mut traversed);
         }
         BlockKind::Mechanism { kind } => {
-            map[x][y] = Some(Block { kind: BlockKind::Mechanism { kind }, orientation: facing, ..*blk });
+            map[x][y] = Some(Block {
+                kind: BlockKind::Mechanism { kind },
+                orientation: facing,
+                ..*blk
+            });
         }
         BlockKind::Transparent => {
             map[x][y] = Some(Block { orientation: facing, ..*blk });
@@ -58,24 +79,21 @@ pub fn place(
         BlockKind::Opaque { .. } => {
             map[x][y] = Some(Block { orientation: facing, ..*blk });
             let (prev_signal, signal_type) = get_prev_signal(map, x, y, [true, true, true, true]);
-            // println!("prev {prev_signal} type, {:?}", signal_type);
-            set_power(map, x, y, prev_signal, signal_type, redstone_block_off_delay, mechanism_on, repeater_on_listener)
+            // // println!("prev {prev_signal} type, {:?}", signal_type);
+            set_power(map, x, y, prev_signal, signal_type, listeners, &mut traversed);
         }
-    };
+    }
+    traversed
 }
 
 pub fn destroy(
     map: &mut Map,
     x: usize,
     y: usize,
-    redstone_block_off_delay: &mut HashSet<(usize, usize)>,
-    redstone_block_on_delay: &mut HashSet<(usize, usize)>,
-    mechanism_on: &mut HashSet<(usize, usize)>,
-    mechanism_off: &mut HashSet<(usize, usize)>,
-    repeater_on_listener:&mut HashSet<(usize, usize)>,
-    repeater_off_listner: &mut HashSet<(usize, usize)>
-) {
+    listeners: &mut EventListener
+) -> HashSet<(usize, usize)> {
     let blk = &map[x][y];
+    let mut traversed: HashSet<(usize, usize)> = HashSet::new();
     match *blk {
         Some(Block { kind, .. }) => {
             match kind {
@@ -90,13 +108,39 @@ pub fn destroy(
                             next_y,
                             signal_type,
                             signal,
-                            redstone_block_on_delay,
-                            redstone_block_off_delay,
-                            mechanism_on,
-                            mechanism_off,
-                            repeater_on_listener,
-                            repeater_off_listner
+                            listeners,
+                            &mut traversed
                         );
+                    }
+                }
+                BlockKind::Opaque { strong_signal, weak_signal } => {
+                    let next_blocks = get_next(&map, x, y, [true, true, true, true]);
+                    map[x][y] = None;
+                    if strong_signal > 0 {
+                        for (next_x, next_y) in &next_blocks {
+                            set_power_to_0(
+                                map,
+                                *next_x,
+                                *next_y,
+                                Some(SignalType::Strong(false)),
+                                strong_signal,
+                                listeners,
+                                &mut traversed
+                            );
+                        }
+                    }
+                    if weak_signal > 0 {
+                        for (next_x, next_y) in &next_blocks {
+                            set_power_to_0(
+                                map,
+                                *next_x,
+                                *next_y,
+                                Some(SignalType::Weak(false)),
+                                weak_signal,
+                                listeners,
+                                &mut traversed
+                            );
+                        }
                     }
                 }
                 _ => {
@@ -105,10 +149,9 @@ pub fn destroy(
             }
         }
 
-        _ => {
-            return;
-        }
+        _ => {}
     }
+    traversed
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -133,4 +176,3 @@ pub enum Orientation {
 }
 
 pub type Ports = [bool; 4];
-pub type Listener = Vec<(usize, usize)>;
