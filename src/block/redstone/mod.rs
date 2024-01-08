@@ -305,7 +305,7 @@ fn update_redstone_signal_to_0(
                         *signal = 0;
                     }
                 }
-                RedstoneKind::Repeater { tick, .. } => {
+                RedstoneKind::Repeater { .. } => {
                     if prev_signal < 20 {
                         println!("fucked up");
                         listeners.repeater_state.insert((x, y), false);

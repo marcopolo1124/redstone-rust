@@ -1,5 +1,6 @@
 use bevy::{ prelude::*, utils::HashMap, window::PrimaryWindow };
 use bevy::input::mouse::MouseWheel;
+use std::f32::consts::PI;
 
 pub mod block;
 pub use block::*;
@@ -40,7 +41,7 @@ const REDSTONE_TORCH: Block = Block {
     }),
 };
 
-const REPEATER: Block = Block{
+const REPEATER: Block = Block {
     movable: false,
     texture_name: TextureName::Repeater(false),
     orientation: Orientation::Up,
@@ -48,8 +49,8 @@ const REPEATER: Block = Block{
         signal: 0,
         input_ports: [false, false, true, false],
         output_ports: [true, false, false, false],
-        kind: RedstoneKind::Repeater { tick: 5, countdown: -1 }
-    })
+        kind: RedstoneKind::Repeater { tick: 5, countdown: -1 },
+    }),
 };
 
 const PISTON: Block = Block {
@@ -88,6 +89,7 @@ fn main() {
         .insert_resource(WorldMap(world_map))
         .insert_resource(EntityMap(entity_map))
         .insert_resource(TextureMap(HashMap::new()))
+        .insert_resource(Orientation::Up)
         .insert_resource(EventListener::new())
         .insert_resource(SelectedBlock(None))
         .insert_resource(Time::<Fixed>::from_seconds(TICK))
@@ -100,6 +102,7 @@ fn main() {
         .add_systems(Update, update_selected_block)
         .add_systems(FixedUpdate, redstone_torch_delayed_listener)
         .add_systems(FixedUpdate, repeater_listener)
+        .add_systems(Update, update_orientation)
         .run();
 }
 
@@ -156,26 +159,52 @@ pub fn update_selected_block(
     }
 }
 
+pub fn update_orientation(
+    keyboard_input: Res<Input<KeyCode>>,
+    mut orientation: ResMut<Orientation>
+) {
+    if keyboard_input.pressed(KeyCode::Left) {
+        *orientation = Orientation::Left;
+    }
+    if keyboard_input.pressed(KeyCode::Right) {
+        *orientation = Orientation::Right;
+    }
+    if keyboard_input.pressed(KeyCode::Up) {
+        *orientation = Orientation::Up;
+    }
+    if keyboard_input.pressed(KeyCode::Down) {
+        *orientation = Orientation::Down;
+    }
+}
+
 pub fn update_entity_map(
     x: usize,
     y: usize,
     map: &Map,
     entity_map: &mut [[Option<Entity>; MAP_SIZE.1]; MAP_SIZE.0],
     textures: &Res<TextureMap>,
-    query: &mut Query<(&mut BlockComponent, &mut Handle<Image>)>
+    query: &mut Query<(&mut Transform, &mut BlockComponent, &mut Handle<Image>)>
 ) {
     let blk = &map[x][y];
     let entity = &mut entity_map[x][y];
     match entity {
         None => {}
         Some(blk_entity) => {
-            if let Ok((_, mut sprite)) = query.get_mut(*blk_entity) {
-                let texture_name = match *blk {
-                    None => TextureName::Air,
-                    Some(Block { texture_name, .. }) => texture_name,
+            if let Ok((mut transform, _, mut sprite)) = query.get_mut(*blk_entity) {
+                let (orientation, texture_name) = match *blk {
+                    None => (Orientation::Up, TextureName::Air),
+                    Some(Block { texture_name, orientation, .. }) => (orientation, texture_name),
                 };
+                let rotate = match orientation{
+                    Orientation::Up => 0.0,
+                    Orientation::Right => 3.0,
+                    Orientation::Down => 2.0,
+                    Orientation::Left => 1.0
+                };
+
                 let mut_ref = sprite.as_mut();
                 *mut_ref = textures.0.get(&texture_name).unwrap().clone();
+                transform.rotation = Quat::from_rotation_z(PI * rotate / 2.0);
             }
         }
     }
@@ -213,10 +242,11 @@ fn mouse_input(
     mut world_map: ResMut<WorldMap>,
     mut entity_map: ResMut<EntityMap>,
     mut listeners: ResMut<EventListener>,
+    orientation: Res<Orientation>,
     textures: Res<TextureMap>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     q_camera: Query<(&Camera, &GlobalTransform)>,
-    mut query: Query<(&mut BlockComponent, &mut Handle<Image>)>,
+    mut query: Query<(&mut Transform, &mut BlockComponent, &mut Handle<Image>)>,
     selected: Res<SelectedBlock>
 ) {
     let (camera, camera_transform) = q_camera.single();
@@ -245,7 +275,7 @@ fn mouse_input(
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
     }
     if buttons.just_pressed(MouseButton::Right) && selected.0 != None {
-        place(&selected.0.unwrap(), x, y, Orientation::Up, map, &mut listeners);
+        place(&selected.0.unwrap(), x, y, *orientation, map, &mut listeners);
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
     }
 }
@@ -293,16 +323,16 @@ fn move_camera(
     if let Ok(mut transform) = query.get_single_mut() {
         let mut direction = Vec3::ZERO;
 
-        if keyboard_input.pressed(KeyCode::Left) || keyboard_input.pressed(KeyCode::A) {
+        if keyboard_input.pressed(KeyCode::A) {
             direction += Vec3::new(-1.0, 0.0, 0.0);
         }
-        if keyboard_input.pressed(KeyCode::Right) || keyboard_input.pressed(KeyCode::D) {
+        if keyboard_input.pressed(KeyCode::D) {
             direction += Vec3::new(1.0, 0.0, 0.0);
         }
-        if keyboard_input.pressed(KeyCode::Up) || keyboard_input.pressed(KeyCode::W) {
+        if keyboard_input.pressed(KeyCode::W) {
             direction += Vec3::new(0.0, 1.0, 0.0);
         }
-        if keyboard_input.pressed(KeyCode::Down) || keyboard_input.pressed(KeyCode::S) {
+        if keyboard_input.pressed(KeyCode::S) {
             direction += Vec3::new(0.0, -1.0, 0.0);
         }
 
@@ -360,7 +390,7 @@ fn redstone_torch_delayed_listener(
     mut world_map: ResMut<WorldMap>,
     mut entity_map: ResMut<EntityMap>,
     textures: Res<TextureMap>,
-    mut query: Query<(&mut BlockComponent, &mut Handle<Image>)>
+    mut query: Query<(&mut Transform, &mut BlockComponent, &mut Handle<Image>)>
 ) {
     // println!("start of listening");
     let mut traversed: HashSet<(usize, usize)> = HashSet::new();
@@ -392,7 +422,7 @@ pub fn repeater_listener(
     mut world_map: ResMut<WorldMap>,
     mut entity_map: ResMut<EntityMap>,
     textures: Res<TextureMap>,
-    mut query: Query<(&mut BlockComponent, &mut Handle<Image>)>
+    mut query: Query<(&mut Transform, &mut BlockComponent, &mut Handle<Image>)>
 ) {
     let mut traversed: HashSet<(usize, usize)> = HashSet::new();
     let repeater_listeners = listeners.repeater_state.clone();
@@ -413,20 +443,18 @@ pub fn repeater_listener(
                     ..
                 },
             ) => {
-                if on{
-                    if *countdown < 0 && signal <= 0{
+                if on {
+                    if *countdown < 0 && signal <= 0 {
                         *countdown = tick;
                     }
 
                     *countdown -= 1;
 
-                    if *countdown <= 0 && signal <= 0{
+                    if *countdown <= 0 && signal <= 0 {
                         *countdown -= 1;
                         set_power(&mut world_map.0, x, y, 20, None, &mut listeners, &mut traversed);
                         listeners.repeater_state.remove(&(x, y));
                     }
-
-                    
                 } else {
                     println!("offing {} {}", *countdown, signal);
                     if *countdown < 0 && signal > 0 {
@@ -437,9 +465,17 @@ pub fn repeater_listener(
 
                     if *countdown <= 0 && signal > 0 {
                         *countdown -= 1;
-                        set_power_to_0(&mut world_map.0, x, y, None, 30, &mut listeners, &mut traversed);
+                        set_power_to_0(
+                            &mut world_map.0,
+                            x,
+                            y,
+                            None,
+                            30,
+                            &mut listeners,
+                            &mut traversed
+                        );
                         listeners.repeater_state.remove(&(x, y));
-                        println!("removed")
+                        println!("removed");
                     }
                 }
             }

@@ -141,7 +141,7 @@ pub enum BlockKind {
     },
 }
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone, Resource)]
 pub enum Orientation {
     Up,
     Right,
