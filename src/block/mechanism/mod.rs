@@ -147,3 +147,18 @@ pub fn execute_off(map: &mut Map, x: usize, y: usize, listeners: &mut EventListe
     }
     true
 }
+
+pub fn mechanism_listener(mut listeners: &mut EventListener, world_map: &mut WorldMap) {
+    let mechanism_state = listeners.mechanism_state.clone();
+    for ((x, y), on) in mechanism_state {
+        let success = if on {
+            execute(&mut world_map.0, x, y, &mut listeners)
+        } else {
+            execute_off(&mut world_map.0, x, y, &mut listeners)
+        };
+
+        if success {
+            listeners.mechanism_state.remove(&(x, y));
+        }
+    }
+}

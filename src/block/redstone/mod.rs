@@ -1,4 +1,10 @@
+mod repeater;
+mod torch;
+
+
 pub use super::*;
+pub use repeater::*;
+pub use torch::*;
 use std::cmp;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
