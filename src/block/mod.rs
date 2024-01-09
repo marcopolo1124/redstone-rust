@@ -2,6 +2,7 @@ mod redstone;
 mod mechanism;
 mod texture;
 
+use bevy::core_pipeline::core_2d::graph::input;
 pub use redstone::*;
 pub use mechanism::*;
 pub use super::*;
@@ -64,11 +65,16 @@ pub fn place(
             // listeners.redstone_state.insert((x, y), (true, prev_signal, signal_type));
         }
         BlockKind::Mechanism (Mechanism{kind, input_ports}) => {
+            let oriented_input_port = orient_port(facing, input_ports);
+           
             map[x][y] = Some(Block {
-                kind: BlockKind::Mechanism(Mechanism{kind, input_ports: orient_port(facing, input_ports)}),
+                kind: BlockKind::Mechanism(Mechanism{kind, input_ports: oriented_input_port}),
                 orientation: facing,
                 ..*blk
             });
+            let (prev_signal, signal_type) = get_prev_signal(map, x, y, oriented_input_port);
+            println!("{prev_signal} {:?}", signal_type);
+            set_power(map, x, y, prev_signal, signal_type, listeners, &mut traversed);
         }
         BlockKind::Transparent => {
             map[x][y] = Some(Block { orientation: facing, ..*blk });

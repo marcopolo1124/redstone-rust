@@ -559,13 +559,17 @@ fn mechanism_listener(mut listeners: ResMut<EventListener>, mut map: ResMut<Worl
     let mechanism_state = listeners.mechanism_state.clone();
     //println!("{:?}", mechanism_state);
     for ((x, y), on) in mechanism_state {
-        if on {
-            execute(&mut map.0, x, y, &mut listeners);
-            
+        
+        let success = if on {
+            execute(&mut map.0, x, y, &mut listeners)
         } else {
-            execute_off(&mut map.0, x, y, &mut listeners);
+            execute_off(&mut map.0, x, y, &mut listeners)
+        };
+
+        if success{
+            listeners.mechanism_state.remove(&(x, y));
         }
-        listeners.mechanism_state.remove(&(x, y));
+        
     }
 }
 

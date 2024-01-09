@@ -199,7 +199,9 @@ pub fn set_power(
             }
         }
         Some(Block { kind: BlockKind::Mechanism { .. }, .. }) => {
-            listeners.mechanism_state.insert((x, y), true);
+            if input_signal > 0{
+                listeners.mechanism_state.insert((x, y), true);
+            };
             None
         }
 

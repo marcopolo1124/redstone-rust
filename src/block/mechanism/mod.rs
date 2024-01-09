@@ -56,7 +56,7 @@ pub fn move_blocks(map: &mut Map, x: i16, y: i16, orientation: Orientation, stre
 
 }
 
-pub fn execute(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener) {
+pub fn execute(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener) -> bool {
     let block = map[x][y];
     match block{
         Some(Block{orientation, kind: BlockKind::Mechanism (Mechanism{kind, ..}), ..}) => {
@@ -77,6 +77,7 @@ pub fn execute(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
                         listeners.entity_map_update.insert((next_x as usize, next_y as usize));
                         listeners.entity_map_update.insert((x as usize, y as usize));
                     }
+                    moved
                 },
                 MechanismKind::StickyPiston => {
                     let moved = move_blocks(map, next_x as i16, next_y as i16, orientation, 20, listeners);
@@ -87,18 +88,17 @@ pub fn execute(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
                         listeners.entity_map_update.insert((next_x as usize, next_y as usize));
                         listeners.entity_map_update.insert((x as usize, y as usize));
                     }
+                    moved
                 },
-                _ => {
-
-                }
+                _ => true
             }
         },
-        _ => {}
+        _ => true
     }
 }
 
 
-pub fn execute_off(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener) {
+pub fn execute_off(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener) -> bool {
     let block = map[x][y];
     match block{
         Some(Block{orientation, kind: BlockKind::Mechanism (Mechanism{kind, ..}), ..}) => {
@@ -145,5 +145,5 @@ pub fn execute_off(map: &mut Map, x: usize, y: usize, listeners: &mut EventListe
         }, 
         _ => {}
     }
-        
+    true
 }
