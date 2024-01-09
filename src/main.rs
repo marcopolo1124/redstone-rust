@@ -483,7 +483,7 @@ fn redstone_torch_delayed_listener(
     }
 }
 
-pub fn repeater_listener(mut listeners: &mut EventListener, world_map: &mut WorldMap) {
+pub fn repeater_listener(listeners: &mut EventListener, world_map: &mut WorldMap) {
     let traversed: HashSet<(usize, usize)> = HashSet::new();
     let repeater_listeners = listeners.repeater_state.clone();
 
