@@ -33,7 +33,7 @@ pub fn mouse_input(
     let map = &mut world_map.0;
     let ent_map = &mut entity_map.0;
     if buttons.just_pressed(MouseButton::Left) {
-        // println!("{} {}", x, y);
+        // //println!("{} {}", x, y);
         destroy(map, x, y, &mut listeners);
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
     }
@@ -43,9 +43,9 @@ pub fn mouse_input(
         } else {
             place(&selected.0.unwrap(), x, y, *orientation, map, &mut listeners);
         }
-        // println!("{:?}", map[x][y]);
+        // //println!("{:?}", map[x][y]);
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
-        // println!("{:?}", map);
+        // //println!("{:?}", map);
     }
 }
 

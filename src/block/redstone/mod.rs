@@ -120,9 +120,13 @@ pub fn set_power_to_0(
                 _ => None,
             }
         }
-        Some(Block { kind: BlockKind::Mechanism { .. }, .. }) => {
-            listeners.mechanism_state.insert((x, y), false);
-            None
+        Some(Block { kind: BlockKind::Mechanism (Mechanism {input_ports, ref mut signal, ..}), .. }) => {
+            let curr_signal = *signal;
+            if prev_signal > curr_signal {
+                *signal = 0;
+                listeners.mechanism_state.insert((x, y), false);
+            }
+            Some(([false, false, false, false], input_ports, curr_signal, None))
         }
 
         _ => None,
@@ -136,6 +140,7 @@ pub fn set_power_to_0(
     };
 
     if curr_signal >= prev_signal || curr_signal == 0 {
+        //println!("returned");
         return;
     }
 
@@ -148,7 +153,7 @@ pub fn set_power_to_0(
 
     let (prev_signal, signal_type) = get_prev_signal(map, x, y, input_ports);
     if prev_signal + 1 >= curr_signal {
-        // println!("propagation attempt");
+        //println!("propagation attempt");
         // debug_map(map);
         set_power(map, x, y, prev_signal, signal_type, listeners, traversed);
     }
@@ -163,7 +168,7 @@ pub fn set_power(
     listeners: &mut EventListener,
     traversed: &mut HashSet<(usize, usize)>
 ) {
-    // println!("current {x} {y}");
+    // //println!("current {x} {y}");
     let blk: &mut Option<Block> = &mut map[x][y];
     let values = match *blk {
         Some(
@@ -190,7 +195,7 @@ pub fn set_power(
         Some(
             Block { kind: BlockKind::Opaque { ref mut strong_signal, ref mut weak_signal }, .. },
         ) => {
-            // println!("{:?}", signal_type);
+            // //println!("{:?}", signal_type);
             match signal_type {
                 Some(SignalType::Strong(true)) => {
                     *strong_signal = cmp::max(input_signal, *strong_signal);
@@ -203,9 +208,12 @@ pub fn set_power(
                 Some(SignalType::Strong(false)) | Some(SignalType::Weak(false)) | None => None,
             }
         }
-        Some(Block { kind: BlockKind::Mechanism { .. }, .. }) => {
-            if input_signal > 0{
+        Some(Block { kind: BlockKind::Mechanism (Mechanism {ref mut signal, ..}), .. }) => {
+            
+            if input_signal > *signal{
                 listeners.mechanism_state.insert((x, y), true);
+                *signal = input_signal;
+                // //println!("setting true {:?} {x} {y}", listeners.mechanism_stat   e);
             };
             None
         }
@@ -240,7 +248,7 @@ fn update_redstone_signal(
     y: usize,
     texture_name: &mut TextureName
 ) -> Option<(u8, Ports, Option<SignalType>)> {
-    // println!("fuffuufufuf {input_signal}");
+    // //println!("fuffuufufuf {input_signal}");
     match signal_type {
         Some(SignalType::Strong(_)) | Some(SignalType::Weak(true)) | None => {
             match *kind {

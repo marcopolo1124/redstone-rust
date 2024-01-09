@@ -4,7 +4,7 @@ pub fn repeater_listener(listeners: &mut EventListener, world_map: &mut WorldMap
     let traversed: HashSet<(usize, usize)> = HashSet::new();
     let repeater_listeners = listeners.repeater_state.clone();
 
-    // println!("{:?}", repeater_listeners);
+    // //println!("{:?}", repeater_listeners);
 
     for ((x, y), on) in repeater_listeners {
         let blk = &mut world_map.0[x][y];

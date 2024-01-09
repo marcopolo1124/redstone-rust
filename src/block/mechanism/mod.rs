@@ -11,7 +11,8 @@ pub enum MechanismKind {
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct Mechanism{
     pub kind: MechanismKind,
-    pub input_ports: Ports
+    pub input_ports: Ports,
+    pub signal: u8
 }
 
 pub fn move_blocks(map: &mut Map, x: i16, y: i16, orientation: Orientation, strength: usize, listeners: &mut EventListener) -> bool{
@@ -20,7 +21,7 @@ pub fn move_blocks(map: &mut Map, x: i16, y: i16, orientation: Orientation, stre
     };
 
     if (x < 0 || x >= (MAP_SIZE.1 as i16 - 1)) || (y < 0 || y >= (MAP_SIZE.0 as i16 - 1)){
-        // println!("return");
+        // //println!("return");
         return false
     };
 
@@ -111,7 +112,7 @@ pub fn execute_off(map: &mut Map, x: usize, y: usize, listeners: &mut EventListe
             match kind {
 
                 MechanismKind::ExtendedPiston => {
-                    // println!("retract");
+                    // //println!("retract");
                     destroy(map, x, y, listeners);
                     place(&PISTON, x, y, orientation, map, listeners );
                     destroy(map, next_x, next_y, listeners);
@@ -150,6 +151,11 @@ pub fn execute_off(map: &mut Map, x: usize, y: usize, listeners: &mut EventListe
 
 pub fn mechanism_listener(mut listeners: &mut EventListener, world_map: &mut WorldMap) {
     let mechanism_state = listeners.mechanism_state.clone();
+    if mechanism_state.len() > 0{
+        //println!("listener {:?}", mechanism_state);
+        //println!(" ")
+    }
+    
     for ((x, y), on) in mechanism_state {
         let success = if on {
             execute(&mut world_map.0, x, y, &mut listeners)

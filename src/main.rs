@@ -68,6 +68,7 @@ const PISTON: Block = Block {
     kind: BlockKind::Mechanism(Mechanism {
         kind: MechanismKind::Piston,
         input_ports: [false, true, true, true],
+        signal: 0
     }),
 };
 
@@ -78,6 +79,7 @@ const EXTENDED_PISTON: Block = Block {
     kind: BlockKind::Mechanism(Mechanism {
         kind: MechanismKind::ExtendedPiston,
         input_ports: [false, true, true, true],
+        signal: 0
     }),
 };
 
@@ -88,6 +90,7 @@ const STICKY_PISTON: Block = Block {
     kind: BlockKind::Mechanism(Mechanism {
         kind: MechanismKind::StickyPiston,
         input_ports: [false, true, true, true],
+        signal: 0
     }),
 };
 
@@ -98,6 +101,7 @@ const STICKY_EXTENDED_PISTON: Block = Block {
     kind: BlockKind::Mechanism(Mechanism {
         kind: MechanismKind::StickyExtendedPiston,
         input_ports: [false, true, true, true],
+        signal: 0
     }),
 };
 
