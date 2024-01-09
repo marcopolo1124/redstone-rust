@@ -1,6 +1,5 @@
 use bevy::{ prelude::*, utils::HashMap, window::PrimaryWindow };
 use bevy::input::mouse::MouseWheel;
-use std::f32::consts::PI;
 
 pub mod block;
 pub use block::*;
@@ -10,6 +9,9 @@ pub use camera::*;
 
 mod mouse;
 pub use mouse::*;
+
+mod debug;
+pub use debug::*;
 
 pub const MAP_SIZE: (usize, usize) = (30, 30);
 pub type Map = [[Option<Block>; MAP_SIZE.0]; MAP_SIZE.1];
@@ -107,25 +109,6 @@ const PISTON_HEAD: Block = Block {
 };
 
 const TICK: f64 = 0.5;
-
-pub fn debug_map(map: &Map) {
-    for row in map {
-        let mut new_row = Vec::new();
-        for blk in row {
-            match *blk {
-                Some(Block { kind: BlockKind::Redstone(Redstone { signal, .. }), .. }) => {
-                    new_row.push((signal, 0));
-                }
-                Some(Block { kind: BlockKind::Opaque { strong_signal, weak_signal }, .. }) => {
-                    new_row.push((strong_signal, weak_signal));
-                }
-                _ => {
-                    new_row.push((0, 0));
-                }
-            }
-        }
-    }
-}
 
 fn main() {
     let world_map = [[None; MAP_SIZE.1]; MAP_SIZE.0];
