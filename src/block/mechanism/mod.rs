@@ -8,13 +8,19 @@ pub enum MechanismKind {
     StickyExtendedPiston,
 }
 
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub struct Mechanism{
+    pub kind: MechanismKind,
+    pub input_ports: Ports
+}
+
 pub fn move_blocks(map: &mut Map, x: i16, y: i16, orientation: Orientation, strength: usize, listeners: &mut EventListener) -> bool{
     if strength <= 0 {
         return false
     };
 
     if (x < 0 || x >= (MAP_SIZE.1 as i16 - 1)) || (y < 0 || y >= (MAP_SIZE.0 as i16 - 1)){
-        println!("return");
+        // println!("return");
         return false
     };
 
@@ -53,7 +59,7 @@ pub fn move_blocks(map: &mut Map, x: i16, y: i16, orientation: Orientation, stre
 pub fn execute(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener) {
     let block = map[x][y];
     match block{
-        Some(Block{orientation, kind: BlockKind::Mechanism { kind }, ..}) => {
+        Some(Block{orientation, kind: BlockKind::Mechanism (Mechanism{kind, ..}), ..}) => {
             let (next_x, next_y) = match orientation{
                 Orientation::Up => (x - 1, y),
                 Orientation::Right => (x, y + 1),
@@ -95,7 +101,7 @@ pub fn execute(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
 pub fn execute_off(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener) {
     let block = map[x][y];
     match block{
-        Some(Block{orientation, kind: BlockKind::Mechanism { kind }, ..}) => {
+        Some(Block{orientation, kind: BlockKind::Mechanism (Mechanism{kind, ..}), ..}) => {
             let (next_x, next_y) = match orientation{
                 Orientation::Up => (x - 1, y),
                 Orientation::Right => (x, y + 1),
@@ -105,7 +111,7 @@ pub fn execute_off(map: &mut Map, x: usize, y: usize, listeners: &mut EventListe
             match kind {
 
                 MechanismKind::ExtendedPiston => {
-                    println!("retract");
+                    // println!("retract");
                     destroy(map, x, y, listeners);
                     place(&PISTON, x, y, orientation, map, listeners );
                     destroy(map, next_x, next_y, listeners);

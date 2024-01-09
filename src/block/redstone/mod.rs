@@ -334,8 +334,7 @@ fn required_input_port(blk: &Option<Block>, ind: usize) -> bool {
             input_ports[ind]
         }
         Some(Block { kind: BlockKind::Opaque { .. }, .. }) => true,
-        Some(Block { kind: BlockKind::Mechanism { .. }, .. }) => {
-            let input_ports = [false, true, true, true];
+        Some(Block { kind: BlockKind::Mechanism (Mechanism{input_ports, ..}), .. }) => {
             input_ports[ind]
         }
         _ => false,

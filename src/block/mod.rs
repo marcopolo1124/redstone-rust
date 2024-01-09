@@ -63,9 +63,9 @@ pub fn place(
             set_power(map, x, y, prev_signal, signal_type, listeners, &mut traversed);
             // listeners.redstone_state.insert((x, y), (true, prev_signal, signal_type));
         }
-        BlockKind::Mechanism { kind } => {
+        BlockKind::Mechanism (Mechanism{kind, input_ports}) => {
             map[x][y] = Some(Block {
-                kind: BlockKind::Mechanism { kind },
+                kind: BlockKind::Mechanism(Mechanism{kind, input_ports: orient_port(facing, input_ports)}),
                 orientation: facing,
                 ..*blk
             });
@@ -191,9 +191,7 @@ pub enum BlockKind {
         weak_signal: u8,
     },
     Redstone(Redstone),
-    Mechanism {
-        kind: MechanismKind,
-    },
+    Mechanism(Mechanism),
 }
 
 #[derive(Debug, PartialEq, Copy, Clone, Resource)]

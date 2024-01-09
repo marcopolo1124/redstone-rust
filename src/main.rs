@@ -57,29 +57,40 @@ const PISTON: Block = Block {
     movable: true,
     texture_name: TextureName::Piston { extended: false },
     orientation: Orientation::Up,
-    kind: BlockKind::Mechanism { kind: MechanismKind::Piston },
+    kind: BlockKind::Mechanism(Mechanism {
+        kind: MechanismKind::Piston,
+        input_ports: [false, true, true, true],
+    }),
 };
 
 const EXTENDED_PISTON: Block = Block {
     movable: false,
     texture_name: TextureName::Piston { extended: true },
     orientation: Orientation::Up,
-    kind: BlockKind::Mechanism { kind: MechanismKind::ExtendedPiston },
+    kind: BlockKind::Mechanism(Mechanism {
+        kind: MechanismKind::ExtendedPiston,
+        input_ports: [false, true, true, true],
+    }),
 };
 
 const STICKY_PISTON: Block = Block {
     movable: true,
     texture_name: TextureName::Piston { extended: false },
     orientation: Orientation::Up,
-    kind: BlockKind::Mechanism { kind: MechanismKind::StickyPiston },
+    kind: BlockKind::Mechanism(Mechanism {
+        kind: MechanismKind::StickyPiston,
+        input_ports: [false, true, true, true],
+    }),
 };
-
 
 const STICKY_EXTENDED_PISTON: Block = Block {
     movable: false,
     texture_name: TextureName::Piston { extended: true },
     orientation: Orientation::Up,
-    kind: BlockKind::Mechanism { kind: MechanismKind::StickyExtendedPiston },
+    kind: BlockKind::Mechanism(Mechanism {
+        kind: MechanismKind::StickyExtendedPiston,
+        input_ports: [false, true, true, true],
+    }),
 };
 
 const PISTON_HEAD: Block = Block {
@@ -189,7 +200,7 @@ pub fn update_selected_block(
         selected.0 = Some(REPEATER);
     } else if keyboard_input.pressed(KeyCode::Key5) {
         selected.0 = Some(PISTON);
-    } else if keyboard_input.pressed(KeyCode::Key6){
+    } else if keyboard_input.pressed(KeyCode::Key6) {
         selected.0 = Some(STICKY_PISTON);
     }
 }
@@ -310,12 +321,12 @@ fn mouse_input(
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
     }
     if buttons.just_pressed(MouseButton::Right) && selected.0 != None {
-        if map[x][y] != None{
-            interact(map, x, y)
-        } else{
+        if map[x][y] != None {
+            interact(map, x, y);
+        } else {
             place(&selected.0.unwrap(), x, y, *orientation, map, &mut listeners);
         }
-        println!("{:?}", map[x][y]);
+        // println!("{:?}", map[x][y]);
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
         //println!("{:?}", map);
     }
@@ -544,15 +555,13 @@ pub fn repeater_listener(
     }
 }
 
-fn mechanism_listener(
-    mut listeners: ResMut<EventListener>,
-    mut map: ResMut<WorldMap>,
-) {
+fn mechanism_listener(mut listeners: ResMut<EventListener>, mut map: ResMut<WorldMap>) {
     let mechanism_state = listeners.mechanism_state.clone();
+    println!("{:?}", mechanism_state);
     for ((x, y), on) in mechanism_state {
         if on {
             execute(&mut map.0, x, y, &mut listeners);
-        } else{
+        } else {
             execute_off(&mut map.0, x, y, &mut listeners);
         }
     }
@@ -565,7 +574,7 @@ fn entity_map_listener(
     textures: Res<TextureMap>,
     mut query: Query<(&mut Transform, &mut BlockComponent, &mut Handle<Image>)>
 ) {
-    for (x, y) in &listeners.entity_map_update{
-        update_entity_map(*x, *y, &map.0, &mut entity_map.0, &textures, &mut query)
+    for (x, y) in &listeners.entity_map_update {
+        update_entity_map(*x, *y, &map.0, &mut entity_map.0, &textures, &mut query);
     }
 }
