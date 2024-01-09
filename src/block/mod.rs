@@ -157,6 +157,10 @@ pub fn destroy(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
                         }
                     }
                 }
+                BlockKind::Mechanism(_) => {
+                    map[x][y] = None;
+                    listeners.mechanism_state.remove(&(x, y));
+                }
                 _ => {
                     map[x][y] = None;
                 }
