@@ -21,7 +21,8 @@ pub type Listener = HashSet<(usize, usize)>;
 pub struct EventListener {
     pub redstone_state: HashMap<(usize, usize), (bool, u8, Option<SignalType>)>,
     pub repeater_state: HashMap<(usize, usize), bool>,
-    pub mechanism_state: HashMap<(usize, usize), bool>
+    pub mechanism_state: HashMap<(usize, usize), bool>,
+    pub entity_map_update: Listener,
 }
 
 impl EventListener {
@@ -30,6 +31,7 @@ impl EventListener {
             redstone_state: HashMap::new(),
             repeater_state: HashMap::new(),
             mechanism_state: HashMap::new(),
+            entity_map_update: HashSet::new(),
         }
     }
 }
@@ -45,6 +47,7 @@ pub fn place(
     if map[x][y] != None {
         return;
     }
+    let mut traversed = HashSet::new();
 
     match blk.kind {
         BlockKind::Redstone(Redstone { signal, input_ports, output_ports, kind }) => {
@@ -57,8 +60,8 @@ pub fn place(
             let (prev_signal, signal_type) = get_prev_signal(map, x, y, redstone.input_ports);
             //println!("{prev_signal} {:?}", signal_type);
             //println!("{prev_signal} {:?}", signal_type);
-            // set_power(map, x, y, prev_signal, signal_type, listeners, &mut traversed);
-            listeners.redstone_state.insert((x, y), (true, prev_signal, signal_type));
+            set_power(map, x, y, prev_signal, signal_type, listeners, &mut traversed);
+            // listeners.redstone_state.insert((x, y), (true, prev_signal, signal_type));
         }
         BlockKind::Mechanism { kind } => {
             map[x][y] = Some(Block {
@@ -74,13 +77,18 @@ pub fn place(
             map[x][y] = Some(Block { orientation: facing, ..*blk });
             let (prev_signal, signal_type) = get_prev_signal(map, x, y, [true, true, true, true]);
             //println!("prev {prev_signal} type, {:?}", signal_type);
-            listeners.redstone_state.insert((x, y), (true, prev_signal, signal_type));
+            set_power(map, x, y, prev_signal, signal_type, listeners, &mut traversed);
+            // listeners.redstone_state.insert((x, y), (true, prev_signal, signal_type));
         }
+    }
+    for (x, y) in traversed {
+        listeners.entity_map_update.insert((x, y));
     }
 }
 
 pub fn destroy(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener) {
     let blk = &map[x][y];
+    let mut traversed = HashSet::new();
     match *blk {
         Some(Block { kind, .. }) => {
             match kind {
@@ -89,11 +97,21 @@ pub fn destroy(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
                     let signal_type = Some(get_signal_type(kind));
                     listeners.redstone_state.remove(&(x, y));
                     map[x][y] = None;
+
                     for (next_x, next_y) in next_blocks {
-                        listeners.redstone_state.insert(
-                            (next_x, next_y),
-                            (false, signal, signal_type)
+                        set_power_to_0(
+                            map,
+                            next_x,
+                            next_y,
+                            signal_type,
+                            signal,
+                            listeners,
+                            &mut traversed
                         );
+                        // listeners.redstone_state.insert(
+                        //     (next_x, next_y),
+                        //     (false, signal, signal_type)
+                        // );
                     }
                 }
                 BlockKind::Opaque { strong_signal, weak_signal } => {
@@ -102,18 +120,36 @@ pub fn destroy(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
                     map[x][y] = None;
                     if strong_signal > 0 {
                         for (next_x, next_y) in &next_blocks {
-                            listeners.redstone_state.insert(
-                                (*next_x, *next_y),
-                                (false, strong_signal, Some(SignalType::Strong(false)))
+                            set_power_to_0(
+                                map,
+                                *next_x,
+                                *next_y,
+                                Some(SignalType::Strong(false)),
+                                strong_signal,
+                                listeners,
+                                &mut traversed
                             );
+                            // listeners.redstone_state.insert(
+                            //     (*next_x, *next_y),
+                            //     (false, strong_signal, Some(SignalType::Strong(false)))
+                            // );
                         }
                     }
                     if weak_signal > 0 {
                         for (next_x, next_y) in &next_blocks {
-                            listeners.redstone_state.insert(
-                                (*next_x, *next_y),
-                                (false, weak_signal, Some(SignalType::Weak(false)))
+                            set_power_to_0(
+                                map,
+                                *next_x,
+                                *next_y,
+                                Some(SignalType::Weak(false)),
+                                weak_signal,
+                                listeners,
+                                &mut traversed
                             );
+                            // listeners.redstone_state.insert(
+                            //     (*next_x, *next_y),
+                            //     (false, weak_signal, Some(SignalType::Weak(false)))
+                            // );
                         }
                     }
                 }
@@ -123,6 +159,26 @@ pub fn destroy(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
             }
         }
 
+        _ => {}
+    }
+    for (x, y) in traversed {
+        listeners.entity_map_update.insert((x, y));
+    }
+}
+
+pub fn interact(map: &mut Map, x: usize, y: usize) {
+    let block = &mut map[x][y];
+    match block {
+        Some(
+            Block {
+                kind: BlockKind::Redstone(
+                    Redstone { kind: RedstoneKind::Repeater { ref mut tick, .. }, .. },
+                ),
+                ..
+            },
+        ) => {
+            *tick = (*tick + 1) % 4;
+        }
         _ => {}
     }
 }

@@ -5,7 +5,7 @@ use std::f32::consts::PI;
 pub mod block;
 pub use block::*;
 
-pub const MAP_SIZE: (usize, usize) = (3, 3);
+pub const MAP_SIZE: (usize, usize) = (30, 30);
 pub type Map = [[Option<Block>; MAP_SIZE.0]; MAP_SIZE.1];
 
 pub use std::collections::HashSet;
@@ -49,7 +49,7 @@ const REPEATER: Block = Block {
         signal: 0,
         input_ports: [false, false, true, false],
         output_ports: [true, false, false, false],
-        kind: RedstoneKind::Repeater { tick: 5, countdown: -1 },
+        kind: RedstoneKind::Repeater { tick: 0, countdown: -1 },
     }),
 };
 
@@ -62,19 +62,34 @@ const PISTON: Block = Block {
 
 const EXTENDED_PISTON: Block = Block {
     movable: false,
-    texture_name: TextureName::Piston {extended: true},
+    texture_name: TextureName::Piston { extended: true },
     orientation: Orientation::Up,
-    kind: BlockKind::Mechanism { kind: MechanismKind::ExtendedPiston }
+    kind: BlockKind::Mechanism { kind: MechanismKind::ExtendedPiston },
+};
+
+const STICKY_PISTON: Block = Block {
+    movable: true,
+    texture_name: TextureName::Piston { extended: false },
+    orientation: Orientation::Up,
+    kind: BlockKind::Mechanism { kind: MechanismKind::StickyPiston },
+};
+
+
+const STICKY_EXTENDED_PISTON: Block = Block {
+    movable: false,
+    texture_name: TextureName::Piston { extended: true },
+    orientation: Orientation::Up,
+    kind: BlockKind::Mechanism { kind: MechanismKind::StickyExtendedPiston },
 };
 
 const PISTON_HEAD: Block = Block {
     movable: false,
     texture_name: TextureName::PistonHead,
     orientation: Orientation::Up,
-    kind: BlockKind::Transparent
+    kind: BlockKind::Transparent,
 };
 
-const TICK: f64 = 0.02;
+const TICK: f64 = 1.0;
 
 pub fn debug_map(map: &Map) {
     for row in map {
@@ -116,7 +131,9 @@ fn main() {
         .add_systems(Update, update_selected_block)
         .add_systems(FixedUpdate, redstone_torch_delayed_listener)
         .add_systems(FixedUpdate, repeater_listener)
+        .add_systems(FixedUpdate, mechanism_listener)
         .add_systems(Update, update_orientation)
+        .add_systems(Update, entity_map_listener)
         .run();
 }
 
@@ -170,8 +187,10 @@ pub fn update_selected_block(
         selected.0 = Some(REDSTONE_TORCH);
     } else if keyboard_input.pressed(KeyCode::Key4) {
         selected.0 = Some(REPEATER);
-    } else if keyboard_input.pressed(KeyCode::Key5){
+    } else if keyboard_input.pressed(KeyCode::Key5) {
         selected.0 = Some(PISTON);
+    } else if keyboard_input.pressed(KeyCode::Key6){
+        selected.0 = Some(STICKY_PISTON);
     }
 }
 
@@ -211,16 +230,16 @@ pub fn update_entity_map(
                     None => (Orientation::Up, TextureName::Air),
                     Some(Block { texture_name, orientation, .. }) => (orientation, texture_name),
                 };
-                let rotate = match orientation{
+                let rotate = match orientation {
                     Orientation::Up => 0.0,
                     Orientation::Right => 3.0,
                     Orientation::Down => 2.0,
-                    Orientation::Left => 1.0
+                    Orientation::Left => 1.0,
                 };
 
                 let mut_ref = sprite.as_mut();
                 *mut_ref = textures.0.get(&texture_name).unwrap().clone();
-                transform.rotation = Quat::from_rotation_z(PI * rotate / 2.0);
+                transform.rotation = Quat::from_rotation_z((PI * rotate) / 2.0);
             }
         }
     }
@@ -291,7 +310,12 @@ fn mouse_input(
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
     }
     if buttons.just_pressed(MouseButton::Right) && selected.0 != None {
-        place(&selected.0.unwrap(), x, y, *orientation, map, &mut listeners);
+        if map[x][y] != None{
+            interact(map, x, y)
+        } else{
+            place(&selected.0.unwrap(), x, y, *orientation, map, &mut listeners);
+        }
+        println!("{:?}", map[x][y]);
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
         //println!("{:?}", map);
     }
@@ -333,6 +357,14 @@ fn load_assets(asset_server: Res<AssetServer>, mut textures: ResMut<TextureMap>)
     );
     assets.insert(
         TextureName::Piston { extended: true },
+        asset_server.load(get_texture_path(TextureName::Piston { extended: true }))
+    );
+    assets.insert(
+        TextureName::StickyPiston { extended: false },
+        asset_server.load(get_texture_path(TextureName::Piston { extended: false }))
+    );
+    assets.insert(
+        TextureName::StickyPiston { extended: true },
         asset_server.load(get_texture_path(TextureName::Piston { extended: true }))
     );
 
@@ -475,24 +507,18 @@ pub fn repeater_listener(
                 if on {
                     if *countdown < 0 && signal <= 0 {
                         *countdown = tick;
-                    }
-
-                    *countdown -= 1;
-
-                    if *countdown <= 0 && signal <= 0 {
+                    } else if *countdown <= 0 && signal <= 0 {
                         *countdown -= 1;
                         set_power(&mut world_map.0, x, y, 20, None, &mut listeners, &mut traversed);
                         listeners.repeater_state.remove(&(x, y));
+                    } else {
+                        *countdown -= 1;
                     }
                 } else {
                     //println!("offing {} {}", *countdown, signal);
                     if *countdown < 0 && signal > 0 {
                         *countdown = tick;
-                    }
-
-                    *countdown -= 1;
-
-                    if *countdown <= 0 && signal > 0 {
+                    } else if *countdown <= 0 && signal > 0 {
                         *countdown -= 1;
                         set_power_to_0(
                             &mut world_map.0,
@@ -505,6 +531,8 @@ pub fn repeater_listener(
                         );
                         listeners.repeater_state.remove(&(x, y));
                         //println!("removed");
+                    } else {
+                        *countdown -= 1;
                     }
                 }
             }
@@ -513,5 +541,31 @@ pub fn repeater_listener(
     }
     for (x, y) in traversed {
         update_entity_map(x, y, &world_map.0, &mut entity_map.0, &textures, &mut query);
+    }
+}
+
+fn mechanism_listener(
+    mut listeners: ResMut<EventListener>,
+    mut map: ResMut<WorldMap>,
+) {
+    let mechanism_state = listeners.mechanism_state.clone();
+    for ((x, y), on) in mechanism_state {
+        if on {
+            execute(&mut map.0, x, y, &mut listeners);
+        } else{
+            execute_off(&mut map.0, x, y, &mut listeners);
+        }
+    }
+}
+
+fn entity_map_listener(
+    listeners: ResMut<EventListener>,
+    map: Res<WorldMap>,
+    mut entity_map: ResMut<EntityMap>,
+    textures: Res<TextureMap>,
+    mut query: Query<(&mut Transform, &mut BlockComponent, &mut Handle<Image>)>
+) {
+    for (x, y) in &listeners.entity_map_update{
+        update_entity_map(*x, *y, &map.0, &mut entity_map.0, &textures, &mut query)
     }
 }
