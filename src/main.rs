@@ -118,7 +118,7 @@ pub fn debug_map(map: &Map) {
                 }
             }
         }
-        ////println!("{:?}", new_row);
+        // println!("{:?}", new_row);
     }
 }
 
@@ -140,11 +140,8 @@ fn main() {
         .add_systems(Update, mouse_input)
         .add_systems(Update, zoom_camera)
         .add_systems(Update, update_selected_block)
-        .add_systems(FixedUpdate, redstone_torch_delayed_listener)
-        .add_systems(FixedUpdate, repeater_listener)
-        .add_systems(FixedUpdate, mechanism_listener)
+        .add_systems(FixedUpdate, (run_listeners, entity_map_listener))
         .add_systems(Update, update_orientation)
-        .add_systems(Update, entity_map_listener)
         .run();
 }
 
@@ -316,7 +313,7 @@ fn mouse_input(
     let map = &mut world_map.0;
     let ent_map = &mut entity_map.0;
     if buttons.just_pressed(MouseButton::Left) {
-        ////println!("{} {}", x, y);
+        // println!("{} {}", x, y);
         destroy(map, x, y, &mut listeners);
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
     }
@@ -326,9 +323,9 @@ fn mouse_input(
         } else {
             place(&selected.0.unwrap(), x, y, *orientation, map, &mut listeners);
         }
-        //println!("{:?}", map[x][y]);
+        // println!("{:?}", map[x][y]);
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
-        ////println!("{:?}", map);
+        // println!("{:?}", map);
     }
 }
 
@@ -458,13 +455,10 @@ fn get_mouse_coord(x: f32, y: f32) -> Option<(usize, usize)> {
 }
 
 fn redstone_torch_delayed_listener(
-    mut listeners: ResMut<EventListener>,
-    mut world_map: ResMut<WorldMap>,
-    mut entity_map: ResMut<EntityMap>,
-    textures: Res<TextureMap>,
-    mut query: Query<(&mut Transform, &mut BlockComponent, &mut Handle<Image>)>
+    mut listeners: &mut EventListener,
+    world_map: &mut WorldMap
 ) {
-    ////println!("start of listening");
+    // println!("start of listening");
     let mut traversed: HashSet<(usize, usize)> = HashSet::new();
     let torch_listeners = listeners.redstone_state.clone();
     listeners.redstone_state.clear();
@@ -485,20 +479,15 @@ fn redstone_torch_delayed_listener(
         }
     }
     for (x, y) in traversed {
-        update_entity_map(x, y, &world_map.0, &mut entity_map.0, &textures, &mut query);
+        listeners.entity_map_update.insert((x, y));
     }
 }
 
-pub fn repeater_listener(
-    mut listeners: ResMut<EventListener>,
-    mut world_map: ResMut<WorldMap>,
-    mut entity_map: ResMut<EntityMap>,
-    textures: Res<TextureMap>,
-    mut query: Query<(&mut Transform, &mut BlockComponent, &mut Handle<Image>)>
-) {
+pub fn repeater_listener(mut listeners: &mut EventListener, world_map: &mut WorldMap) {
     let mut traversed: HashSet<(usize, usize)> = HashSet::new();
     let repeater_listeners = listeners.repeater_state.clone();
-    ////println!("{:?}", repeater_listeners);
+
+    // println!("{:?}", repeater_listeners);
 
     for ((x, y), on) in repeater_listeners {
         let blk = &mut world_map.0[x][y];
@@ -515,62 +504,56 @@ pub fn repeater_listener(
                     ..
                 },
             ) => {
-                if on {
-                    if *countdown < 0 && signal <= 0 {
-                        *countdown = tick;
-                    } else if *countdown <= 0 && signal <= 0 {
-                        *countdown -= 1;
-                        set_power(&mut world_map.0, x, y, 20, None, &mut listeners, &mut traversed);
+                // println!("repeater {x} {y} countdown {} tick {tick}", countdown);
+
+                if *countdown < 0 {
+                    if (on && signal > 0) || (!on && signal <= 0){
                         listeners.repeater_state.remove(&(x, y));
                     } else {
-                        *countdown -= 1;
-                    }
-                } else {
-                    ////println!("offing {} {}", *countdown, signal);
-                    if *countdown < 0 && signal > 0 {
                         *countdown = tick;
-                    } else if *countdown <= 0 && signal > 0 {
-                        *countdown -= 1;
-                        set_power_to_0(
-                            &mut world_map.0,
-                            x,
-                            y,
-                            None,
-                            30,
-                            &mut listeners,
-                            &mut traversed
-                        );
-                        listeners.repeater_state.remove(&(x, y));
-                        ////println!("removed");
-                    } else {
-                        *countdown -= 1;
                     }
                 }
+
+                if *countdown > 0 {
+                    *countdown -= 1;
+                }
+                else if *countdown == 0 {
+                    *countdown -= 1;
+                    if signal <= 0 {
+                        listeners.redstone_state.insert((x, y), (true, 20, None));
+                    } else {
+                        listeners.redstone_state.insert((x, y), (false, 30, None));
+                    }
+                    
+                } 
             }
             _ => {}
         }
     }
     for (x, y) in traversed {
-        update_entity_map(x, y, &world_map.0, &mut entity_map.0, &textures, &mut query);
+        listeners.entity_map_update.insert((x, y));
     }
 }
 
-fn mechanism_listener(mut listeners: ResMut<EventListener>, mut map: ResMut<WorldMap>) {
+fn mechanism_listener(mut listeners: &mut EventListener, world_map: &mut WorldMap) {
     let mechanism_state = listeners.mechanism_state.clone();
-    //println!("{:?}", mechanism_state);
     for ((x, y), on) in mechanism_state {
-        
         let success = if on {
-            execute(&mut map.0, x, y, &mut listeners)
+            execute(&mut world_map.0, x, y, &mut listeners)
         } else {
-            execute_off(&mut map.0, x, y, &mut listeners)
+            execute_off(&mut world_map.0, x, y, &mut listeners)
         };
 
-        if success{
+        if success {
             listeners.mechanism_state.remove(&(x, y));
         }
-        
     }
+}
+
+fn run_listeners(mut listeners: ResMut<EventListener>, mut world_map: ResMut<WorldMap>) {
+    redstone_torch_delayed_listener(listeners.as_mut(), world_map.as_mut());
+    repeater_listener(listeners.as_mut(), world_map.as_mut());
+    mechanism_listener(listeners.as_mut(), world_map.as_mut());
 }
 
 fn entity_map_listener(
