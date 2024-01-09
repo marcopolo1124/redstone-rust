@@ -20,7 +20,7 @@ pub fn move_blocks(map: &mut Map, x: i16, y: i16, orientation: Orientation, stre
     };
 
     if (x < 0 || x >= (MAP_SIZE.1 as i16 - 1)) || (y < 0 || y >= (MAP_SIZE.0 as i16 - 1)){
-        // println!("return");
+        //println!("return");
         return false
     };
 
@@ -111,7 +111,7 @@ pub fn execute_off(map: &mut Map, x: usize, y: usize, listeners: &mut EventListe
             match kind {
 
                 MechanismKind::ExtendedPiston => {
-                    // println!("retract");
+                    //println!("retract");
                     destroy(map, x, y, listeners);
                     place(&PISTON, x, y, orientation, map, listeners );
                     destroy(map, next_x, next_y, listeners);

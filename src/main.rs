@@ -100,7 +100,7 @@ const PISTON_HEAD: Block = Block {
     kind: BlockKind::Transparent,
 };
 
-const TICK: f64 = 1.0;
+const TICK: f64 = 0.5;
 
 pub fn debug_map(map: &Map) {
     for row in map {
@@ -118,7 +118,7 @@ pub fn debug_map(map: &Map) {
                 }
             }
         }
-        //println!("{:?}", new_row);
+        ////println!("{:?}", new_row);
     }
 }
 
@@ -316,7 +316,7 @@ fn mouse_input(
     let map = &mut world_map.0;
     let ent_map = &mut entity_map.0;
     if buttons.just_pressed(MouseButton::Left) {
-        //println!("{} {}", x, y);
+        ////println!("{} {}", x, y);
         destroy(map, x, y, &mut listeners);
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
     }
@@ -326,9 +326,9 @@ fn mouse_input(
         } else {
             place(&selected.0.unwrap(), x, y, *orientation, map, &mut listeners);
         }
-        // println!("{:?}", map[x][y]);
+        //println!("{:?}", map[x][y]);
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
-        //println!("{:?}", map);
+        ////println!("{:?}", map);
     }
 }
 
@@ -464,7 +464,7 @@ fn redstone_torch_delayed_listener(
     textures: Res<TextureMap>,
     mut query: Query<(&mut Transform, &mut BlockComponent, &mut Handle<Image>)>
 ) {
-    //println!("start of listening");
+    ////println!("start of listening");
     let mut traversed: HashSet<(usize, usize)> = HashSet::new();
     let torch_listeners = listeners.redstone_state.clone();
     listeners.redstone_state.clear();
@@ -498,7 +498,7 @@ pub fn repeater_listener(
 ) {
     let mut traversed: HashSet<(usize, usize)> = HashSet::new();
     let repeater_listeners = listeners.repeater_state.clone();
-    //println!("{:?}", repeater_listeners);
+    ////println!("{:?}", repeater_listeners);
 
     for ((x, y), on) in repeater_listeners {
         let blk = &mut world_map.0[x][y];
@@ -526,7 +526,7 @@ pub fn repeater_listener(
                         *countdown -= 1;
                     }
                 } else {
-                    //println!("offing {} {}", *countdown, signal);
+                    ////println!("offing {} {}", *countdown, signal);
                     if *countdown < 0 && signal > 0 {
                         *countdown = tick;
                     } else if *countdown <= 0 && signal > 0 {
@@ -541,7 +541,7 @@ pub fn repeater_listener(
                             &mut traversed
                         );
                         listeners.repeater_state.remove(&(x, y));
-                        //println!("removed");
+                        ////println!("removed");
                     } else {
                         *countdown -= 1;
                     }
@@ -557,13 +557,15 @@ pub fn repeater_listener(
 
 fn mechanism_listener(mut listeners: ResMut<EventListener>, mut map: ResMut<WorldMap>) {
     let mechanism_state = listeners.mechanism_state.clone();
-    println!("{:?}", mechanism_state);
+    //println!("{:?}", mechanism_state);
     for ((x, y), on) in mechanism_state {
         if on {
             execute(&mut map.0, x, y, &mut listeners);
+            
         } else {
             execute_off(&mut map.0, x, y, &mut listeners);
         }
+        listeners.mechanism_state.remove(&(x, y));
     }
 }
 
