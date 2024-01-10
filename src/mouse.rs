@@ -36,7 +36,7 @@ pub fn mouse_input(
         // //println!("{} {}", x, y);
         destroy(map, x, y, &mut listeners);
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
-    }
+            }
     if buttons.just_pressed(MouseButton::Right) && selected.0 != None {
         if map[x][y] != None {
             interact(map, x, y);
@@ -45,7 +45,6 @@ pub fn mouse_input(
         }
         // //println!("{:?}", map[x][y]);
         update_entity_map(x, y, map, ent_map, &textures, &mut query);
-        // //println!("{:?}", map);
     }
 }
 

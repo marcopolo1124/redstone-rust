@@ -112,10 +112,6 @@ pub fn destroy(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
                             listeners,
                             &mut traversed
                         );
-                        // listeners.redstone_state.insert(
-                        //     (next_x, next_y),
-                        //     (false, signal, signal_type)
-                        // );
                     }
                 }
                 BlockKind::Opaque { strong_signal, weak_signal } => {

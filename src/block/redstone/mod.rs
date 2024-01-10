@@ -385,7 +385,13 @@ fn prev_output_signal(blk: &Option<Block>, ind: usize) -> (u8, Option<SignalType
             }
         }
         Some(Block { kind: BlockKind::Opaque { strong_signal, weak_signal }, .. }) => {
-            (std::cmp::max(strong_signal, weak_signal), None)
+            if strong_signal > 0 {
+                (strong_signal, Some(SignalType::Strong(false)))
+            } else if weak_signal > 0 {
+                (weak_signal, Some(SignalType::Weak(false)))
+            } else {
+                (0, None)
+            }
         }
         _ => (0, None),
     }
