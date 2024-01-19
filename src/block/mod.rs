@@ -85,9 +85,7 @@ pub fn place(
             // listeners.redstone_state.insert((x, y), (true, prev_signal, signal_type));
         }
     }
-    for (x, y) in traversed {
         listeners.entity_map_update.insert((x, y));
-    }
 }
 
 pub fn destroy(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener) {
