@@ -4,15 +4,13 @@ pub fn redstone_torch_delayed_listener(
     mut listeners: &mut EventListener,
     world_map: &mut WorldMap
 ) {
-    // //println!("start of listening");
-    let mut traversed: HashSet<(usize, usize)> = HashSet::new();
+    ////println!("start of listening");
     let torch_listeners = listeners.redstone_state.clone();
-    let length = torch_listeners.len();
     listeners.redstone_state.clear();
 
     for ((x, y), (on, signal, signal_type)) in torch_listeners {
         if on {
-            set_power(&mut world_map.0, x, y, signal, signal_type, &mut listeners, &mut traversed);
+            set_power(&mut world_map.0, x, y, signal, signal_type, &mut listeners);
         } else {
             set_power_to_0(
                 &mut world_map.0,
@@ -21,15 +19,7 @@ pub fn redstone_torch_delayed_listener(
                 signal_type,
                 signal,
                 &mut listeners,
-                &mut traversed
             );
         }
-    }
-    for (x, y) in traversed {
-        listeners.entity_map_update.insert((x, y));
-    }
-
-    if length > 0{
-        //println!("redstone ends here")
     }
 }

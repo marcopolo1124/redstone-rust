@@ -1,4 +1,72 @@
 use super::*;
+use bevy::prelude::*;
+// use bevy_asset_loader::asset_collection::AssetCollection;
+use bevy_asset_loader::prelude::*;
+
+#[derive(AssetCollection, Resource)]
+pub struct ImageAssets {
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 2, rows = 1))]
+    #[asset(path = "images/redstone_torch.png")]
+    #[asset(image(sampler = nearest))]
+    redstone_torch: Handle<TextureAtlas>,
+
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 1, rows = 1))]
+    #[asset(path = "images/dirt.png")]
+    #[asset(image(sampler = nearest))]
+    dirt: Handle<TextureAtlas>,
+
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 2, rows = 1))]
+    #[asset(path = "images/piston.png")]
+    #[asset(image(sampler = nearest))]
+    piston: Handle<TextureAtlas>,
+
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 2, rows = 1))]
+    #[asset(path = "images/sticky_piston.png")]
+    #[asset(image(sampler = nearest))]
+    sticky_piston: Handle<TextureAtlas>,
+
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 1, rows = 1))]
+    #[asset(path = "images/piston_extension.png")]
+    #[asset(image(sampler = nearest))]
+    piston_head: Handle<TextureAtlas>,
+
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 1, rows = 1))]
+    #[asset(path = "images/sticky_piston_extension.png")]
+    #[asset(image(sampler = nearest))]
+    sticky_piston_head: Handle<TextureAtlas>,
+
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 8, rows = 1))]
+    #[asset(path = "images/redstone_repeater.png")]
+    #[asset(image(sampler = nearest))]
+    repeater: Handle<TextureAtlas>,
+
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 16, rows = 1))]
+    #[asset(path = "images/redstone_dust.png")]
+    #[asset(image(sampler = nearest))]
+    redstone_dust: Handle<TextureAtlas>,
+
+
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 1, rows = 1))]
+    #[asset(path = "images/black_wool.png")]
+    #[asset(image(sampler = nearest))]
+    air: Handle<TextureAtlas>,
+}
+
+pub fn get_atlas(texture_name: TextureName, image_assets: &ImageAssets) -> Handle<TextureAtlas> {
+    match texture_name {
+        TextureName::Dirt => image_assets.dirt.clone(),
+        TextureName::RedstoneTorch(_) => image_assets.redstone_torch.clone(),
+        TextureName::RedstoneDust( .. ) => image_assets.redstone_dust.clone(),
+        TextureName::Piston { .. } => image_assets.piston.clone(),
+        TextureName::StickyPiston { .. } => image_assets.sticky_piston.clone(),
+        TextureName::PistonHead => image_assets.piston_head.clone(),
+        TextureName::StickyPistonHead => image_assets.sticky_piston_head.clone(),
+        TextureName::Repeater(..) => image_assets.repeater.clone(),
+        TextureName::Air => image_assets.air.clone(),
+    }
+    // image_assets.dirt.clone()
+}
+
 use std::f32::consts::PI;
 #[derive(Resource)]
 pub struct TextureMap(pub HashMap<TextureName, Handle<Image>>);
@@ -26,21 +94,8 @@ pub enum TextureName {
 pub fn get_texture_name(texture: TextureName) -> String {
     let name = match texture {
         TextureName::Dirt => "dirt.png",
-        TextureName::RedstoneTorch(on) => if on {
-            "redstone_torch.png"
-        } else {
-            "redstone_torch_off.png"
-        }
-        TextureName::RedstoneDust(on) => if on {
-            "redstone_dust_on.png"
-        } else {
-            "redstone_dust_off.png"
-        }
-        TextureName::Piston { extended } | TextureName::StickyPiston { extended } => if extended {
-            "piston_extended_base.png"
-        } else {
-            "piston_side.png"
-        }
+        TextureName::RedstoneTorch(_) => "redstone_torch.png",
+        TextureName::Piston { .. } | TextureName::StickyPiston { .. } => "piston_side.png",
         TextureName::PistonHead | TextureName::StickyPistonHead => "piston_extension.png",
         TextureName::Repeater(on) => if on {
             "redstone_repeater_on.png"
@@ -57,98 +112,77 @@ pub fn get_sprite(
     x: usize,
     y: usize,
     blk: &Option<Block>,
-    textures: &Res<TextureMap>
-) -> SpriteBundle {
-    let texture = match *blk {
-        None => { TextureName::Air }
-        Some(Block { texture_name, .. }) => { texture_name }
+    image_assets: &ImageAssets
+) -> SpriteSheetBundle {
+    let (texture_name, state) = match *blk {
+        None => { (TextureName::Air, 0) }
+        Some(block) => { (block.texture_name, get_state(block)) }
     };
 
-    let handle = textures.0.get(&texture).unwrap();
-    SpriteBundle {
+    let handle = get_atlas(texture_name, image_assets);
+    SpriteSheetBundle {
         transform: Transform::from_xyz(
             BOX_WIDTH * (y as f32),
             BOX_WIDTH * ((MAP_SIZE.1 - x - 1) as f32),
             0.0
         ).with_scale(Vec3::splat(2.2)),
-        texture: handle.clone(),
+        sprite: TextureAtlasSprite::new(state),
+        texture_atlas: handle,
         ..default()
     }
 }
 
-fn get_texture_path(texture_name: TextureName) -> String {
-    format!("images/{}", get_texture_name(texture_name))
+pub fn get_state(blk: Block) -> usize {
+    match blk {
+        Block { kind: BlockKind::Redstone(Redstone { signal, kind, .. }), .. } => {
+            match kind {
+                RedstoneKind::Torch => {
+                    if signal > 0 {
+                        //println!("1 {:?}", blk);
+                        1
+                    } else {
+                        0
+                    }
+                }
+                RedstoneKind::Block => signal as usize,
+                RedstoneKind::Repeater {tick, ..} => {
+                    let col_ind = if signal > 0 {1} else {0};
+                    let row_ind = tick * 2;
+                    (row_ind + col_ind) as usize
+                }
+            }
+        }
+        Block {kind: BlockKind::Mechanism(Mechanism{ kind, ..}), ..} => {
+            match kind {
+                MechanismKind::Piston { extended } | MechanismKind::StickyPiston { extended } => {
+                    if extended {1} else {0}
+                }
+                _ => 0
+            }
+        }
+        _ => 0,
+    }
 }
-
-pub fn load_assets(asset_server: Res<AssetServer>, mut textures: ResMut<TextureMap>) {
-    let assets = &mut textures.0;
-    assets.insert(TextureName::Dirt, asset_server.load(get_texture_path(TextureName::Dirt)));
-    assets.insert(
-        TextureName::RedstoneDust(false),
-        asset_server.load(get_texture_path(TextureName::RedstoneDust(false)))
-    );
-    assets.insert(
-        TextureName::RedstoneDust(true),
-        asset_server.load(get_texture_path(TextureName::RedstoneDust(true)))
-    );
-    assets.insert(
-        TextureName::RedstoneTorch(false),
-        asset_server.load(get_texture_path(TextureName::RedstoneTorch(false)))
-    );
-    assets.insert(
-        TextureName::RedstoneTorch(true),
-        asset_server.load(get_texture_path(TextureName::RedstoneTorch(true)))
-    );
-    assets.insert(
-        TextureName::Repeater(false),
-        asset_server.load(get_texture_path(TextureName::Repeater(false)))
-    );
-    assets.insert(
-        TextureName::Repeater(true),
-        asset_server.load(get_texture_path(TextureName::Repeater(true)))
-    );
-    assets.insert(
-        TextureName::Piston { extended: false },
-        asset_server.load(get_texture_path(TextureName::Piston { extended: false }))
-    );
-    assets.insert(
-        TextureName::Piston { extended: true },
-        asset_server.load(get_texture_path(TextureName::Piston { extended: true }))
-    );
-    assets.insert(
-        TextureName::StickyPiston { extended: false },
-        asset_server.load(get_texture_path(TextureName::Piston { extended: false }))
-    );
-    assets.insert(
-        TextureName::StickyPiston { extended: true },
-        asset_server.load(get_texture_path(TextureName::Piston { extended: true }))
-    );
-
-    assets.insert(
-        TextureName::PistonHead,
-        asset_server.load(get_texture_path(TextureName::PistonHead))
-    );
-    assets.insert(TextureName::Air, asset_server.load(get_texture_path(TextureName::Air)));
-}
-
 
 pub fn update_entity_map(
     x: usize,
     y: usize,
+    image_assets: &ImageAssets,
+    entity_map: &mut EntityMap,
     map: &Map,
-    entity_map: &mut [[Option<Entity>; MAP_SIZE.1]; MAP_SIZE.0],
-    textures: &Res<TextureMap>,
-    query: &mut Query<(&mut Transform, &mut BlockComponent, &mut Handle<Image>)>
+    query: &mut Query<
+        (&mut Transform, &mut BlockComponent, &mut Handle<TextureAtlas>, &mut TextureAtlasSprite)
+    >
 ) {
+    let entity = &mut entity_map.0[x][y];
     let blk = &map[x][y];
-    let entity = &mut entity_map[x][y];
     match entity {
         None => {}
         Some(blk_entity) => {
-            if let Ok((mut transform, _, mut sprite)) = query.get_mut(*blk_entity) {
-                let (orientation, texture_name) = match *blk {
-                    None => (Orientation::Up, TextureName::Air),
-                    Some(Block { texture_name, orientation, .. }) => (orientation, texture_name),
+            if let Ok((mut transform, _, mut atlas, mut sprite)) = query.get_mut(*blk_entity) {
+                let (orientation, texture_name, state) = match *blk {
+                    None => (Orientation::Up, TextureName::Air, 0),
+                    Some(blk) => (blk.orientation, blk.texture_name, get_state(blk)),
                 };
                 let rotate = match orientation {
                     Orientation::Up => 0.0,
@@ -157,22 +191,56 @@ pub fn update_entity_map(
                     Orientation::Left => 1.0,
                 };
 
-                let mut_ref = sprite.as_mut();
-                *mut_ref = textures.0.get(&texture_name).unwrap().clone();
+                let mut_ref = atlas.as_mut();
+                sprite.index = state;
+                *mut_ref = get_atlas(texture_name, image_assets).clone();
                 transform.rotation = Quat::from_rotation_z((PI * rotate) / 2.0);
             }
         }
     }
 }
 
+pub fn update_entity_state(
+    x: usize,
+    y: usize,
+    entity_map: &mut EntityMap,
+    map: &Map,
+    query: &mut Query<
+        (&mut Transform, &mut BlockComponent, &mut Handle<TextureAtlas>, &mut TextureAtlasSprite)
+    >
+) {
+    let entity = &mut entity_map.0[x][y];
+    let blk = &map[x][y];
+    match entity {
+        None => {}
+        Some(blk_entity) => {
+            if let Ok((_, _, _, mut sprite)) = query.get_mut(*blk_entity) {
+                let state = match *blk {
+                    None => 0,
+                    Some(blk) => get_state(blk),
+                };
+                sprite.index = state;
+            }
+        }
+    }
+}
+
 pub fn entity_map_listener(
-    listeners: ResMut<EventListener>,
+    mut listeners: ResMut<EventListener>,
     map: Res<WorldMap>,
     mut entity_map: ResMut<EntityMap>,
-    textures: Res<TextureMap>,
-    mut query: Query<(&mut Transform, &mut BlockComponent, &mut Handle<Image>)>
+    mut query: Query<
+        (&mut Transform, &mut BlockComponent, &mut Handle<TextureAtlas>, &mut TextureAtlasSprite)
+    >,
+    image_assets: Res<ImageAssets>
 ) {
-    for (x, y) in &listeners.entity_map_update {
-        update_entity_map(*x, *y, &map.0, &mut entity_map.0, &textures, &mut query);
+    for ((x, y), update_atlas) in &listeners.entity_map_update {
+        if *update_atlas {
+            update_entity_map(*x, *y, image_assets.as_ref(), &mut entity_map, &map.0, &mut query);
+        } else{
+            update_entity_state(*x, *y, &mut entity_map, &map.0, &mut query)
+        }
+       
     }
+    listeners.entity_map_update.clear()
 }

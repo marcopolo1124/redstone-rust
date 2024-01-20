@@ -96,8 +96,14 @@ pub fn execute(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
                     if let Some(Block{ref mut movable, ..}) = map[x][y]{
                         *movable = false
                     }
-                    place(&PISTON_HEAD, next_x, next_y, orientation, map, listeners);
-                    listeners.entity_map_update.insert((x, y));
+                    if let MechanismKind::StickyPiston { .. } = kind {
+                        place(&STICKY_PISTON_HEAD, next_x, next_y, orientation, map, listeners);
+                    } else {
+                        place(&PISTON_HEAD, next_x, next_y, orientation, map, listeners);
+                    }
+                    
+                    listeners.entity_map_update.insert((x, y), false);
+                    //println!("{:?}", listeners.entity_map_update);
                 }
                 return moved;
             }
@@ -108,6 +114,7 @@ pub fn execute(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
 
 pub fn execute_off(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener) -> bool {
     let block = &mut map[x][y];
+    
     if let Some(Block { orientation, ref mut kind, .. }) = *block {
         let (next_x, next_y) = match orientation {
             Orientation::Up => (x - 1, y),
@@ -201,8 +208,10 @@ pub fn mechanism_listener(mut listeners: &mut EventListener, world_map: &mut Wor
         } else {
             execute_off(&mut world_map.0, x, y, &mut listeners)
         };
+        
 
         if success {
+            listeners.entity_map_update.insert((x, y), false);
             listeners.mechanism_state.remove(&(x, y));
         }
     }

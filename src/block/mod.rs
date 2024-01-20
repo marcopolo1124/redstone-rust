@@ -21,7 +21,7 @@ pub struct EventListener {
     pub redstone_state: HashMap<(usize, usize), (bool, u8, Option<SignalType>)>,
     pub repeater_state: HashMap<(usize, usize), bool>,
     pub mechanism_state: HashMap<(usize, usize), bool>,
-    pub entity_map_update: Listener,
+    pub entity_map_update: HashMap<(usize, usize), bool>,
 }
 
 impl EventListener {
@@ -30,7 +30,7 @@ impl EventListener {
             redstone_state: HashMap::new(),
             repeater_state: HashMap::new(),
             mechanism_state: HashMap::new(),
-            entity_map_update: HashSet::new(),
+            entity_map_update: HashMap::new(),
         }
     }
 }
@@ -46,7 +46,6 @@ pub fn place(
     if map[x][y] != None {
         return;
     }
-    let mut traversed = HashSet::new();
 
     match blk.kind {
         BlockKind::Redstone(Redstone { signal, input_ports, output_ports, kind }) => {
@@ -57,9 +56,9 @@ pub fn place(
                 ..*blk
             });
             let (prev_signal, signal_type) = get_prev_signal(map, x, y, redstone.input_ports);
-            // //println!("{prev_signal} {:?}", signal_type);
-            // //println!("{prev_signal} {:?}", signal_type);
-            set_power(map, x, y, prev_signal, signal_type, listeners, &mut traversed);
+            ////println!("{prev_signal} {:?}", signal_type);
+            ////println!("{prev_signal} {:?}", signal_type);
+            set_power(map, x, y, prev_signal, signal_type, listeners);
             // listeners.redstone_state.insert((x, y), (true, prev_signal, signal_type));
         }
         BlockKind::Mechanism (Mechanism{kind, input_ports, signal: _}) => {
@@ -71,8 +70,8 @@ pub fn place(
                 ..*blk
             });
             let (prev_signal, signal_type) = get_prev_signal(map, x, y, oriented_input_port);
-            // //println!("{prev_signal} {:?}", signal_type);
-            set_power(map, x, y, prev_signal, signal_type, listeners, &mut traversed);
+            ////println!("{prev_signal} {:?}", signal_type);
+            set_power(map, x, y, prev_signal, signal_type, listeners);
         }
         BlockKind::Transparent => {
             map[x][y] = Some(Block { orientation: facing, ..*blk });
@@ -80,17 +79,16 @@ pub fn place(
         BlockKind::Opaque { .. } => {
             map[x][y] = Some(Block { orientation: facing, ..*blk });
             let (prev_signal, signal_type) = get_prev_signal(map, x, y, [true, true, true, true]);
-            // //println!("prev {prev_signal} type, {:?}", signal_type);
-            set_power(map, x, y, prev_signal, signal_type, listeners, &mut traversed);
+            ////println!("prev {prev_signal} type, {:?}", signal_type);
+            set_power(map, x, y, prev_signal, signal_type, listeners);
             // listeners.redstone_state.insert((x, y), (true, prev_signal, signal_type));
         }
     }
-        listeners.entity_map_update.insert((x, y));
+    listeners.entity_map_update.insert((x, y), true);
 }
 
 pub fn destroy(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener) {
     let blk = &map[x][y];
-    let mut traversed = HashSet::new();
     match *blk {
         Some(Block { kind, .. }) => {
             match kind {
@@ -108,7 +106,6 @@ pub fn destroy(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
                             signal_type,
                             signal,
                             listeners,
-                            &mut traversed
                         );
                     }
                 }
@@ -125,7 +122,6 @@ pub fn destroy(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
                                 Some(SignalType::Strong(false)),
                                 strong_signal,
                                 listeners,
-                                &mut traversed
                             );
                             // listeners.redstone_state.insert(
                             //     (*next_x, *next_y),
@@ -142,12 +138,7 @@ pub fn destroy(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
                                 Some(SignalType::Weak(false)),
                                 weak_signal,
                                 listeners,
-                                &mut traversed
                             );
-                            // listeners.redstone_state.insert(
-                            //     (*next_x, *next_y),
-                            //     (false, weak_signal, Some(SignalType::Weak(false)))
-                            // );
                         }
                     }
                 }
@@ -163,9 +154,7 @@ pub fn destroy(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
 
         _ => {}
     }
-    for (x, y) in traversed {
-        listeners.entity_map_update.insert((x, y));
-    }
+    listeners.entity_map_update.insert((x, y), true);
 }
 
 pub fn interact(map: &mut Map, x: usize, y: usize) {

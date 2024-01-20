@@ -6,10 +6,12 @@ pub fn mouse_input(
     mut entity_map: ResMut<EntityMap>,
     mut listeners: ResMut<EventListener>,
     orientation: Res<Orientation>,
-    textures: Res<TextureMap>,
+    image_assets: Res<ImageAssets>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
     q_camera: Query<(&Camera, &GlobalTransform)>,
-    mut query: Query<(&mut Transform, &mut BlockComponent, &mut Handle<Image>)>,
+    mut query: Query<
+        (&mut Transform, &mut BlockComponent, &mut Handle<TextureAtlas>, &mut TextureAtlasSprite)
+    >,
     selected: Res<SelectedBlock>
 ) {
     let (camera, camera_transform) = q_camera.single();
@@ -31,21 +33,21 @@ pub fn mouse_input(
         return;
     };
     let map = &mut world_map.0;
-    let ent_map = &mut entity_map.0;
     if buttons.just_pressed(MouseButton::Left) {
-        // //println!("{} {}", x, y);
+        ////println!("{} {}", x, y);
         destroy(map, x, y, &mut listeners);
-        update_entity_map(x, y, map, ent_map, &textures, &mut query);
-            }
+        update_entity_map(x, y, image_assets.as_ref(), &mut entity_map, &map, &mut query);
+    }
     if buttons.just_pressed(MouseButton::Right) && selected.0 != None {
         if map[x][y] != None {
             interact(map, x, y);
         } else {
             place(&selected.0.unwrap(), x, y, *orientation, map, &mut listeners);
         }
-        // //println!("{:?}", map[x][y]);
-        update_entity_map(x, y, map, ent_map, &textures, &mut query);
+        ////println!("{:?}", map[x][y]);
+        update_entity_map(x, y, image_assets.as_ref(), &mut entity_map, &map, &mut query);
     }
+    
 }
 
 fn get_mouse_coord(x: f32, y: f32) -> Option<(usize, usize)> {

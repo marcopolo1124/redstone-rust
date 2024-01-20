@@ -1,10 +1,9 @@
 use super::*;
 
 pub fn repeater_listener(listeners: &mut EventListener, world_map: &mut WorldMap) {
-    let traversed: HashSet<(usize, usize)> = HashSet::new();
     let repeater_listeners = listeners.repeater_state.clone();
 
-    // //println!("{:?}", repeater_listeners);
+    ////println!("{:?}", repeater_listeners);
 
     for ((x, y), on) in repeater_listeners {
         let blk = &mut world_map.0[x][y];
@@ -37,16 +36,15 @@ pub fn repeater_listener(listeners: &mut EventListener, world_map: &mut WorldMap
                     *countdown -= 1;
                     if signal <= 0 {
                         listeners.redstone_state.insert((x, y), (true, 20, None));
+                        listeners.entity_map_update.insert((x, y), false);
                     } else {
                         listeners.redstone_state.insert((x, y), (false, 30, None));
+                        listeners.entity_map_update.insert((x, y), false);
                     }
                     
                 } 
             }
             _ => {}
         }
-    }
-    for (x, y) in traversed {
-        listeners.entity_map_update.insert((x, y));
     }
 }

@@ -1,7 +1,10 @@
 use bevy::{ prelude::*, utils::HashMap, window::PrimaryWindow };
 use bevy::input::mouse::MouseWheel;
 
+use bevy_asset_loader::prelude::*;
+
 pub mod block;
+use bevy_asset_loader::loading_state::{ LoadingStateAppExt, LoadingState };
 pub use block::*;
 
 mod camera;
@@ -66,20 +69,20 @@ const PISTON: Block = Block {
     texture_name: TextureName::Piston { extended: false },
     orientation: Orientation::Up,
     kind: BlockKind::Mechanism(Mechanism {
-        kind: MechanismKind::Piston{extended: false},
+        kind: MechanismKind::Piston { extended: false },
         input_ports: [false, true, true, true],
-        signal: 0
+        signal: 0,
     }),
 };
 
 const STICKY_PISTON: Block = Block {
     movable: true,
-    texture_name: TextureName::Piston { extended: false },
+    texture_name: TextureName::StickyPiston { extended: false },
     orientation: Orientation::Up,
     kind: BlockKind::Mechanism(Mechanism {
-        kind: MechanismKind::StickyPiston{extended: false},
+        kind: MechanismKind::StickyPiston { extended: false },
         input_ports: [false, true, true, true],
-        signal: 0
+        signal: 0,
     }),
 };
 
@@ -90,12 +93,22 @@ const PISTON_HEAD: Block = Block {
     kind: BlockKind::Transparent,
 };
 
-const TICK: f64 = 0.5;
+const STICKY_PISTON_HEAD: Block = Block {
+    movable: false,
+    texture_name: TextureName::StickyPistonHead,
+    orientation: Orientation::Up,
+    kind: BlockKind::Transparent,
+};
+
+const TICK: f64 = 0.2;
 
 fn main() {
-    let world_map = [[None; MAP_SIZE.1]; MAP_SIZE.0];
+    let mut world_map = [[None; MAP_SIZE.1]; MAP_SIZE.0];
+    world_map[0][0] = Some(REDSTONE_TORCH);
     let entity_map = [[None; MAP_SIZE.1]; MAP_SIZE.0];
     App::new()
+        .add_state::<MyStates>()
+        .add_plugins(DefaultPlugins)
         .insert_resource(WorldMap(world_map))
         .insert_resource(EntityMap(entity_map))
         .insert_resource(TextureMap(HashMap::new()))
@@ -103,16 +116,27 @@ fn main() {
         .insert_resource(EventListener::new())
         .insert_resource(SelectedBlock(None))
         .insert_resource(Time::<Fixed>::from_seconds(TICK))
-        .add_plugins(DefaultPlugins)
-        .add_systems(Startup, load_assets)
-        .add_systems(Startup, init)
-        .add_systems(Update, move_camera)
-        .add_systems(Update, mouse_input)
-        .add_systems(Update, zoom_camera)
-        .add_systems(Update, update_selected_block)
-        .add_systems(FixedUpdate, (run_listeners, entity_map_listener))
-        .add_systems(Update, update_orientation)
+        .add_loading_state(
+            LoadingState::new(MyStates::AssetLoading)
+                .continue_to_state(MyStates::Next)
+                .load_collection::<ImageAssets>()
+        )
+        .add_systems(OnEnter(MyStates::Next), init)
+        .add_systems(Update, move_camera.run_if(in_state(MyStates::Next)))
+        .add_systems(Update, mouse_input.run_if(in_state(MyStates::Next)))
+        .add_systems(Update, zoom_camera.run_if(in_state(MyStates::Next)))
+        .add_systems(Update, update_selected_block.run_if(in_state(MyStates::Next)))
+        .add_systems(FixedUpdate, (run_listeners).run_if(in_state(MyStates::Next)))
+        .add_systems(Update, entity_map_listener.run_if(in_state(MyStates::Next)))
+        .add_systems(Update, update_orientation.run_if(in_state(MyStates::Next)))
         .run();
+}
+
+#[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]
+enum MyStates {
+    #[default]
+    AssetLoading,
+    Next,
 }
 
 #[derive(Resource)]
@@ -132,7 +156,7 @@ fn init(
     mut commands: Commands,
     map: Res<WorldMap>,
     mut entity_map: ResMut<EntityMap>,
-    textures: Res<TextureMap>
+    image_assets: Res<ImageAssets>
 ) {
     commands.spawn(Camera2dBundle {
         // transform: Transform::from_xyz(window.width() / 2.0, window.height() / 2.0, 0.0),
@@ -141,13 +165,14 @@ fn init(
 
     for (x, row) in map.as_ref().0.iter().enumerate() {
         for (y, blk) in row.iter().enumerate() {
-            let sprite_bundle = get_sprite(x, y, blk, &textures);
-            commands.spawn(get_sprite(x, y, &None, &textures));
+            let sprite_bundle = get_sprite(x, y, blk, image_assets.as_ref());
+            commands.spawn(get_sprite(x, y, &None, image_assets.as_ref()));
             let entity = commands.spawn((sprite_bundle, BlockComponent)).id();
 
             entity_map.as_mut().0[x][y] = Some(entity);
         }
     }
+    //println!("{:?}", map.0);
 }
 
 pub fn update_selected_block(

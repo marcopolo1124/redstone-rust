@@ -60,7 +60,6 @@ pub fn set_power_to_0(
     signal_type: Option<SignalType>,
     prev_signal: u8,
     listeners: &mut EventListener,
-    traversed: &mut Listener
 ) {
     let blk: &mut Option<Block> = &mut map[x][y];
     let values = match *blk {
@@ -140,22 +139,22 @@ pub fn set_power_to_0(
     };
 
     if curr_signal >= prev_signal || curr_signal == 0 {
-        //println!("returned");
+        ////println!("returned");
         return;
     }
 
-    traversed.insert((x, y));
+    listeners.entity_map_update.insert((x, y), false);
 
     let next_coord = get_next(map, x, y, output_ports);
     for (next_x, next_y) in next_coord {
-        set_power_to_0(map, next_x, next_y, signal_type, curr_signal, listeners, traversed);
+        set_power_to_0(map, next_x, next_y, signal_type, curr_signal, listeners);
     }
 
     let (prev_signal, signal_type) = get_prev_signal(map, x, y, input_ports);
     if prev_signal + 1 >= curr_signal {
-        //println!("propagation attempt");
+        ////println!("propagation attempt");
         // debug_map(map);
-        set_power(map, x, y, prev_signal, signal_type, listeners, traversed);
+        set_power(map, x, y, prev_signal, signal_type, listeners);
     }
 }
 
@@ -166,9 +165,8 @@ pub fn set_power(
     input_signal: u8,
     signal_type: Option<SignalType>,
     listeners: &mut EventListener,
-    traversed: &mut HashSet<(usize, usize)>
 ) {
-    // //println!("current {x} {y}");
+    ////println!("current {x} {y}");
     let blk: &mut Option<Block> = &mut map[x][y];
     let values = match *blk {
         Some(
@@ -195,7 +193,7 @@ pub fn set_power(
         Some(
             Block { kind: BlockKind::Opaque { ref mut strong_signal, ref mut weak_signal }, .. },
         ) => {
-            // //println!("{:?}", signal_type);
+            ////println!("{:?}", signal_type);
             match signal_type {
                 Some(SignalType::Strong(true)) => {
                     *strong_signal = cmp::max(input_signal, *strong_signal);
@@ -213,7 +211,7 @@ pub fn set_power(
             if input_signal > *signal{
                 listeners.mechanism_state.insert((x, y), true);
                 *signal = input_signal;
-                // //println!("setting true {:?} {x} {y}", listeners.mechanism_stat   e);
+                ////println!("setting true {:?} {x} {y}", listeners.mechanism_stat   e);
             };
             None
         }
@@ -226,11 +224,11 @@ pub fn set_power(
             return;
         }
         Some((signal, output_ports, signal_type)) => {
-            traversed.insert((x, y));
+            listeners.entity_map_update.insert((x, y), false);
             let next_blocks = get_next(map, x, y, output_ports);
             for (next_x, next_y) in next_blocks {
                 if signal > 1 {
-                    set_power(map, next_x, next_y, signal - 1, signal_type, listeners, traversed);
+                    set_power(map, next_x, next_y, signal - 1, signal_type, listeners);
                 }
             }
         }
@@ -248,7 +246,7 @@ fn update_redstone_signal(
     y: usize,
     texture_name: &mut TextureName
 ) -> Option<(u8, Ports, Option<SignalType>)> {
-    // //println!("fuffuufufuf {input_signal}");
+    ////println!("fuffuufufuf {input_signal}");
     match signal_type {
         Some(SignalType::Strong(_)) | Some(SignalType::Weak(true)) | None => {
             match *kind {
