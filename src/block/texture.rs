@@ -45,6 +45,11 @@ pub struct ImageAssets {
     #[asset(image(sampler = nearest))]
     redstone_dust: Handle<TextureAtlas>,
 
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 176, rows = 1))]
+    #[asset(path = "images/redstone_dust_var.png")]
+    #[asset(image(sampler = nearest))] 
+    redstone_dust_var: Handle<TextureAtlas>,
+
 
     #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 1, rows = 1))]
     #[asset(path = "images/black_wool.png")]
@@ -57,7 +62,7 @@ pub fn get_atlas(texture_name: TextureName, image_assets: &ImageAssets) -> Handl
         TextureName::Dirt => image_assets.dirt.clone(),
         TextureName::RedstoneTorch(_) => image_assets.redstone_torch.clone(),
         TextureName::RedstoneCross( .. ) => image_assets.redstone_dust.clone(),
-        TextureName::RedstoneDust => image_assets.redstone_dust.clone(),
+        TextureName::RedstoneDust => image_assets.redstone_dust_var.clone(),
         TextureName::Piston { .. } => image_assets.piston.clone(),
         TextureName::StickyPiston { .. } => image_assets.sticky_piston.clone(),
         TextureName::PistonHead => image_assets.piston_head.clone(),
@@ -117,9 +122,26 @@ pub fn get_sprite(
     }
 }
 
+fn get_connection(ports: &Ports) -> usize{
+    match *ports {
+        [true, true, true, true] => 10,
+        [false, true, true, true] => 9,
+        [true, false, true, true] => 8,
+        [true, true, false, true] => 7,
+        [true, true, true, false] => 6,
+        [false, false, true, true] => 5,
+        [false, true, false, true] => 4,
+        [false, true, true, false] => 3,
+        [true, false, false, true] => 2,
+        [true, false, true, false] => 1,
+        [true, true, false, false] => 0,
+        _ => 10
+    }
+}
+
 pub fn get_state(blk: Block) -> usize {
     match blk {
-        Block { kind: BlockKind::Redstone(Redstone { signal, kind, .. }), .. } => {
+        Block { kind: BlockKind::Redstone(Redstone { signal, kind, input_ports, .. }), .. } => {
             match kind {
                 RedstoneKind::Torch  => {
                     if signal > 0 {
@@ -129,11 +151,15 @@ pub fn get_state(blk: Block) -> usize {
                         0
                     }
                 }
-                RedstoneKind::Block | RedstoneKind::Dust => signal as usize,
+                RedstoneKind::Block => signal as usize,
                 RedstoneKind::Repeater {tick, ..} => {
                     let col_ind = if signal > 0 {1} else {0};
                     let row_ind = tick * 2;
                     (row_ind + col_ind) as usize
+                }
+                RedstoneKind::Dust => {
+                    let conn_ind = get_connection(&input_ports);
+                    conn_ind * 16 + signal as usize
                 }
             }
         }

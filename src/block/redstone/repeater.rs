@@ -3,8 +3,6 @@ use super::*;
 pub fn repeater_listener(listeners: &mut EventListener, world_map: &mut WorldMap) {
     let repeater_listeners = listeners.repeater_state.clone();
 
-    ////println!("{:?}", repeater_listeners);
-
     for ((x, y), on) in repeater_listeners {
         let blk = &mut world_map.0[x][y];
         match *blk {

@@ -57,21 +57,25 @@ pub fn place(
             let redstone = place_redstone(signal, sym_facing, kind, input_ports, output_ports);
             map[x][y] = Some(Block {
                 kind: BlockKind::Redstone(redstone),
-                orientation: facing,
+                orientation: sym_facing,
                 ..*blk
             });
             update_port(map, x, y);
             if x > 0 && is_redstone(map, x - 1, y) {
                 update_port(map, x - 1, y);
+                listeners.entity_map_update.insert((x - 1, y), true);
             }
             if y + 1 < MAP_SIZE.0 && is_redstone(map, x, y + 1) {
                 update_port(map, x, y + 1);
+                listeners.entity_map_update.insert((x, y + 1), true);
             }
             if x + 1 < MAP_SIZE.1 && is_redstone(map, x + 1, y) {
                 update_port(map, x + 1, y);
+                listeners.entity_map_update.insert((x + 1, y), true);
             }
             if y > 0 && is_redstone(map, x, y - 1) {
-                update_port(map, x, y -1);
+                update_port(map, x, y - 1);
+                listeners.entity_map_update.insert((x, y - 1), true);
             }
             let (prev_signal, signal_type) = get_prev_signal(map, x, y, redstone.input_ports);
             ////println!("{prev_signal} {:?}", signal_type);
@@ -79,11 +83,15 @@ pub fn place(
             set_power(map, x, y, prev_signal, signal_type, listeners);
             // listeners.redstone_state.insert((x, y), (true, prev_signal, signal_type));
         }
-        BlockKind::Mechanism (Mechanism{kind, input_ports, signal: _}) => {
+        BlockKind::Mechanism(Mechanism { kind, input_ports, signal: _ }) => {
             let oriented_input_port = orient_port(facing, input_ports);
-           
+
             map[x][y] = Some(Block {
-                kind: BlockKind::Mechanism(Mechanism{kind, input_ports: oriented_input_port, signal: 0}),
+                kind: BlockKind::Mechanism(Mechanism {
+                    kind,
+                    input_ports: oriented_input_port,
+                    signal: 0,
+                }),
                 orientation: facing,
                 ..*blk
             });
@@ -115,16 +123,25 @@ pub fn destroy(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
                     let signal_type = Some(get_signal_type(kind));
                     listeners.redstone_state.remove(&(x, y));
                     map[x][y] = None;
+                    if x > 0 && is_redstone(map, x - 1, y) {
+                        update_port(map, x - 1, y);
+                        listeners.entity_map_update.insert((x - 1, y), true);
+                    }
+                    if y + 1 < MAP_SIZE.0 && is_redstone(map, x, y + 1) {
+                        update_port(map, x, y + 1);
+                        listeners.entity_map_update.insert((x, y + 1), true);
+                    }
+                    if x + 1 < MAP_SIZE.1 && is_redstone(map, x + 1, y) {
+                        update_port(map, x + 1, y);
+                        listeners.entity_map_update.insert((x + 1, y), true);
+                    }
+                    if y > 0 && is_redstone(map, x, y - 1) {
+                        update_port(map, x, y - 1);
+                        listeners.entity_map_update.insert((x, y - 1), true);
+                    }
 
                     for (next_x, next_y) in next_blocks {
-                        set_power_to_0(
-                            map,
-                            next_x,
-                            next_y,
-                            signal_type,
-                            signal,
-                            listeners,
-                        );
+                        set_power_to_0(map, next_x, next_y, signal_type, signal, listeners);
                     }
                 }
                 BlockKind::Opaque { strong_signal, weak_signal } => {
@@ -139,7 +156,7 @@ pub fn destroy(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
                                 *next_y,
                                 Some(SignalType::Strong(false)),
                                 strong_signal,
-                                listeners,
+                                listeners
                             );
                             // listeners.redstone_state.insert(
                             //     (*next_x, *next_y),
@@ -155,7 +172,7 @@ pub fn destroy(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
                                 *next_y,
                                 Some(SignalType::Weak(false)),
                                 weak_signal,
-                                listeners,
+                                listeners
                             );
                         }
                     }

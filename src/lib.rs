@@ -41,7 +41,7 @@ const REDSTONE_CROSS: Block = Block {
 };
 
 const REDSTONE_DUST: Block = Block {
-    texture_name: TextureName::RedstoneCross(false),
+    texture_name: TextureName::RedstoneDust,
     movable: false,
     orientation: Orientation::Up,
     kind: BlockKind::Redstone(Redstone {
