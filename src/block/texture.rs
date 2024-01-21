@@ -56,7 +56,8 @@ pub fn get_atlas(texture_name: TextureName, image_assets: &ImageAssets) -> Handl
     match texture_name {
         TextureName::Dirt => image_assets.dirt.clone(),
         TextureName::RedstoneTorch(_) => image_assets.redstone_torch.clone(),
-        TextureName::RedstoneDust( .. ) => image_assets.redstone_dust.clone(),
+        TextureName::RedstoneCross( .. ) => image_assets.redstone_dust.clone(),
+        TextureName::RedstoneDust => image_assets.redstone_dust.clone(),
         TextureName::Piston { .. } => image_assets.piston.clone(),
         TextureName::StickyPiston { .. } => image_assets.sticky_piston.clone(),
         TextureName::PistonHead => image_assets.piston_head.clone(),
@@ -78,7 +79,8 @@ pub struct EntityMap(pub [[Option<Entity>; MAP_SIZE.1]; MAP_SIZE.0]);
 pub enum TextureName {
     Dirt,
     RedstoneTorch(bool),
-    RedstoneDust(bool),
+    RedstoneCross(bool),
+    RedstoneDust,
     Piston {
         extended: bool,
     },
@@ -89,23 +91,6 @@ pub enum TextureName {
     StickyPistonHead,
     Repeater(bool),
     Air,
-}
-
-pub fn get_texture_name(texture: TextureName) -> String {
-    let name = match texture {
-        TextureName::Dirt => "dirt.png",
-        TextureName::RedstoneTorch(_) => "redstone_torch.png",
-        TextureName::Piston { .. } | TextureName::StickyPiston { .. } => "piston_side.png",
-        TextureName::PistonHead | TextureName::StickyPistonHead => "piston_extension.png",
-        TextureName::Repeater(on) => if on {
-            "redstone_repeater_on.png"
-        } else {
-            "redstone_repeater_off.png"
-        }
-        _ => { "white_wool.png" }
-    };
-
-    name.to_string()
 }
 
 pub fn get_sprite(
@@ -136,7 +121,7 @@ pub fn get_state(blk: Block) -> usize {
     match blk {
         Block { kind: BlockKind::Redstone(Redstone { signal, kind, .. }), .. } => {
             match kind {
-                RedstoneKind::Torch => {
+                RedstoneKind::Torch  => {
                     if signal > 0 {
                         //println!("1 {:?}", blk);
                         1
@@ -144,7 +129,7 @@ pub fn get_state(blk: Block) -> usize {
                         0
                     }
                 }
-                RedstoneKind::Block => signal as usize,
+                RedstoneKind::Block | RedstoneKind::Dust => signal as usize,
                 RedstoneKind::Repeater {tick, ..} => {
                     let col_ind = if signal > 0 {1} else {0};
                     let row_ind = tick * 2;

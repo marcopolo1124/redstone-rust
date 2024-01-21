@@ -49,12 +49,30 @@ pub fn place(
 
     match blk.kind {
         BlockKind::Redstone(Redstone { signal, input_ports, output_ports, kind }) => {
-            let redstone = place_redstone(signal, facing, kind, input_ports, output_ports);
+            let mut sym_facing = facing;
+            if let RedstoneKind::Dust = kind {
+                sym_facing = Orientation::Up;
+            }
+
+            let redstone = place_redstone(signal, sym_facing, kind, input_ports, output_ports);
             map[x][y] = Some(Block {
                 kind: BlockKind::Redstone(redstone),
                 orientation: facing,
                 ..*blk
             });
+            update_port(map, x, y);
+            if x > 0 && is_redstone(map, x - 1, y) {
+                update_port(map, x - 1, y);
+            }
+            if y + 1 < MAP_SIZE.0 && is_redstone(map, x, y + 1) {
+                update_port(map, x, y + 1);
+            }
+            if x + 1 < MAP_SIZE.1 && is_redstone(map, x + 1, y) {
+                update_port(map, x + 1, y);
+            }
+            if y > 0 && is_redstone(map, x, y - 1) {
+                update_port(map, x, y -1);
+            }
             let (prev_signal, signal_type) = get_prev_signal(map, x, y, redstone.input_ports);
             ////println!("{prev_signal} {:?}", signal_type);
             ////println!("{prev_signal} {:?}", signal_type);

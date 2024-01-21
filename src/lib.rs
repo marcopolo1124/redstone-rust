@@ -28,8 +28,8 @@ const DIRT: Block = Block {
     kind: BlockKind::Opaque { strong_signal: 0, weak_signal: 0 },
 };
 
-const REDSTONE_DUST: Block = Block {
-    texture_name: TextureName::RedstoneDust(false),
+const REDSTONE_CROSS: Block = Block {
+    texture_name: TextureName::RedstoneCross(false),
     movable: false,
     orientation: Orientation::Up,
     kind: BlockKind::Redstone(Redstone {
@@ -39,6 +39,21 @@ const REDSTONE_DUST: Block = Block {
         kind: RedstoneKind::Block,
     }),
 };
+
+const REDSTONE_DUST: Block = Block {
+    texture_name: TextureName::RedstoneCross(false),
+    movable: false,
+    orientation: Orientation::Up,
+    kind: BlockKind::Redstone(Redstone {
+        signal: 0,
+        input_ports: [true, true, true, true],
+        output_ports: [true, true, true, true],
+        kind: RedstoneKind::Dust,
+    }),
+};
+
+
+
 
 const REDSTONE_TORCH: Block = Block {
     movable: false,
@@ -181,7 +196,7 @@ pub fn update_selected_block(
     if keyboard_input.pressed(KeyCode::Key1) {
         selected.0 = Some(DIRT);
     } else if keyboard_input.pressed(KeyCode::Key2) {
-        selected.0 = Some(REDSTONE_DUST);
+        selected.0 = Some(REDSTONE_CROSS);
     } else if keyboard_input.pressed(KeyCode::Key3) {
         selected.0 = Some(REDSTONE_TORCH);
     } else if keyboard_input.pressed(KeyCode::Key4) {
@@ -190,6 +205,8 @@ pub fn update_selected_block(
         selected.0 = Some(PISTON);
     } else if keyboard_input.pressed(KeyCode::Key6) {
         selected.0 = Some(STICKY_PISTON);
+    } else if keyboard_input.pressed(KeyCode::Key7) {
+        selected.0 = Some(REDSTONE_DUST);
     }
 }
 

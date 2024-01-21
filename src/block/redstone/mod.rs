@@ -1,7 +1,6 @@
 mod repeater;
 mod torch;
 
-
 pub use super::*;
 pub use repeater::*;
 pub use torch::*;
@@ -15,12 +14,13 @@ pub enum RedstoneKind {
         countdown: i16,
     },
     Block,
+    Dust,
 }
 
 pub fn get_signal_type(kind: RedstoneKind) -> SignalType {
     match kind {
         RedstoneKind::Torch | RedstoneKind::Repeater { .. } => SignalType::Strong(true),
-        RedstoneKind::Block => SignalType::Weak(true),
+        RedstoneKind::Block | RedstoneKind::Dust => SignalType::Weak(true),
     }
 }
 
@@ -53,13 +53,101 @@ pub fn place_redstone(
     }
 }
 
+pub fn update_port(map: &mut Map, x: usize, y: usize) {
+    if
+        let Some(
+            Block { kind: BlockKind::Redstone(Redstone { kind: RedstoneKind::Dust, .. }), .. },
+        ) = map[x][y]
+    {
+        toggle_port(map, x, y, Orientation::Up, false);
+        toggle_port(map, x, y, Orientation::Right, false);
+        toggle_port(map, x, y, Orientation::Down, false);
+        toggle_port(map, x, y, Orientation::Left, false);
+    } else {
+        return;
+    }
+
+    let mut count = 0;
+    let mut orientation = Orientation::Up;
+    if x > 0 && is_redstone(map, x - 1, y) {
+        toggle_port(map, x, y, Orientation::Up, true);
+        count += 1;
+        orientation = Orientation::Down;
+    }
+    if y + 1 < MAP_SIZE.0 && is_redstone(map, x, y + 1) {
+        toggle_port(map, x, y, Orientation::Right, true);
+        count += 1;
+        orientation = Orientation::Left;
+    }
+    if x + 1 < MAP_SIZE.1 && is_redstone(map, x + 1, y) {
+        toggle_port(map, x, y, Orientation::Down, true);
+        count += 1;
+        orientation = Orientation::Up;
+    }
+    if y > 0 && is_redstone(map, x, y - 1) {
+        toggle_port(map, x, y, Orientation::Left, true);
+        count += 1;
+        orientation = Orientation::Right;
+    }
+
+    if count == 1 {
+        toggle_port(map, x, y, orientation, true)
+    }
+}
+
+pub fn is_redstone(map: &Map, x: usize, y: usize) -> bool {
+    match map[x][y] {
+        Some(Block { kind: BlockKind::Redstone(_), .. }) => true,
+        _ => false,
+    }
+}
+
+fn toggle_port(map: &mut Map, x: usize, y: usize, orientation: Orientation, open: bool) {
+    let block = &mut map[x][y];
+    match *block {
+        Some(
+            Block {
+                kind: BlockKind::Redstone(
+                    Redstone {
+                        kind: RedstoneKind::Dust,
+                        ref mut output_ports,
+                        ref mut input_ports,
+                        ..
+                    },
+                ),
+                ..
+            },
+        ) => {
+            match orientation {
+                Orientation::Up => {
+                    input_ports[0] = open;
+                    output_ports[0] = open;
+                }
+                Orientation::Right => {
+                    input_ports[1] = open;
+                    output_ports[1] = open;
+                }
+                Orientation::Down => {
+                    input_ports[2] = open;
+                    output_ports[2] = open;
+                }
+                Orientation::Left => {
+                    input_ports[3] = open;
+                    output_ports[3] = open;
+                }
+            }
+        }
+        _ => (),
+    }
+}
+
 pub fn set_power_to_0(
     map: &mut Map,
     x: usize,
     y: usize,
     signal_type: Option<SignalType>,
     prev_signal: u8,
-    listeners: &mut EventListener,
+    listeners: &mut EventListener
 ) {
     let blk: &mut Option<Block> = &mut map[x][y];
     let values = match *blk {
@@ -68,7 +156,6 @@ pub fn set_power_to_0(
                 kind: BlockKind::Redstone(
                     Redstone { ref mut signal, ref mut kind, output_ports, input_ports, .. },
                 ),
-                ref mut texture_name,
                 ..
             },
         ) => {
@@ -77,7 +164,6 @@ pub fn set_power_to_0(
                 y,
                 signal_type,
                 kind,
-                texture_name,
                 signal,
                 prev_signal,
                 listeners
@@ -119,7 +205,9 @@ pub fn set_power_to_0(
                 _ => None,
             }
         }
-        Some(Block { kind: BlockKind::Mechanism (Mechanism {input_ports, ref mut signal, ..}), .. }) => {
+        Some(
+            Block { kind: BlockKind::Mechanism(Mechanism { input_ports, ref mut signal, .. }), .. },
+        ) => {
             let curr_signal = *signal;
             if prev_signal > curr_signal {
                 *signal = 0;
@@ -164,9 +252,8 @@ pub fn set_power(
     y: usize,
     input_signal: u8,
     signal_type: Option<SignalType>,
-    listeners: &mut EventListener,
+    listeners: &mut EventListener
 ) {
-    ////println!("current {x} {y}");
     let blk: &mut Option<Block> = &mut map[x][y];
     let values = match *blk {
         Some(
@@ -174,7 +261,6 @@ pub fn set_power(
                 kind: BlockKind::Redstone(
                     Redstone { ref mut signal, ref mut kind, output_ports, .. },
                 ),
-                ref mut texture_name,
                 ..
             },
         ) => {
@@ -186,8 +272,7 @@ pub fn set_power(
                 output_ports,
                 input_signal,
                 x,
-                y,
-                texture_name
+                y
             )
         }
         Some(
@@ -206,13 +291,11 @@ pub fn set_power(
                 Some(SignalType::Strong(false)) | Some(SignalType::Weak(false)) | None => None,
             }
         }
-        Some(Block { kind: BlockKind::Mechanism (Mechanism {ref mut signal, ..}), .. }) => {
-            
-            if input_signal > *signal{
+        Some(Block { kind: BlockKind::Mechanism(Mechanism { ref mut signal, .. }), .. }) => {
+            if input_signal > *signal {
                 listeners.mechanism_state.insert((x, y), true);
                 *signal = input_signal;
-                ////println!("setting true {:?} {x} {y}", listeners.mechanism_stat   e);
-            };
+            }
             None
         }
 
@@ -243,17 +326,14 @@ fn update_redstone_signal(
     output_ports: Ports,
     input_signal: u8,
     x: usize,
-    y: usize,
-    texture_name: &mut TextureName
+    y: usize
 ) -> Option<(u8, Ports, Option<SignalType>)> {
-    ////println!("fuffuufufuf {input_signal}");
     match signal_type {
         Some(SignalType::Strong(_)) | Some(SignalType::Weak(true)) | None => {
             match *kind {
                 RedstoneKind::Torch => {
                     if input_signal <= 0 {
                         *signal = 16;
-                        *texture_name = TextureName::RedstoneTorch(true);
                         Some((16, output_ports, Some(SignalType::Strong(true))))
                     } else {
                         listeners.redstone_state.insert((x, y), (false, 20, None));
@@ -261,22 +341,20 @@ fn update_redstone_signal(
                     }
                 }
                 RedstoneKind::Repeater { .. } => {
-                    if input_signal >= 20{
+                    if input_signal >= 20 {
                         *signal = 16;
-                        *texture_name = TextureName::Repeater(true);
                         Some((16, output_ports, Some(SignalType::Strong(true))))
-                    } else if input_signal > 0{
+                    } else if input_signal > 0 {
                         listeners.repeater_state.insert((x, y), true);
                         None
                     } else {
                         None
                     }
                 }
-                RedstoneKind::Block => {
+                RedstoneKind::Block | RedstoneKind::Dust => {
                     if input_signal > 0 {
                         if *signal < input_signal {
                             *signal = input_signal;
-                            *texture_name = TextureName::RedstoneDust(true);
                             if input_signal > 1 {
                                 Some((input_signal, output_ports, Some(SignalType::Weak(true))))
                             } else {
@@ -300,7 +378,6 @@ fn update_redstone_signal_to_0(
     y: usize,
     signal_type: Option<SignalType>,
     kind: &mut RedstoneKind,
-    texture_name: &mut TextureName,
     signal: &mut u8,
     prev_signal: u8,
     listeners: &mut EventListener
@@ -314,7 +391,6 @@ fn update_redstone_signal_to_0(
                     if prev_signal < 20 {
                         listeners.redstone_state.insert((x, y), (true, 0, None));
                     } else {
-                        *texture_name = TextureName::RedstoneTorch(false);
                         *signal = 0;
                     }
                 }
@@ -323,13 +399,11 @@ fn update_redstone_signal_to_0(
                         listeners.repeater_state.insert((x, y), false);
                     } else {
                         *signal = 0;
-                        *texture_name = TextureName::Repeater(false);
                     }
                 }
-                RedstoneKind::Block => {
+                RedstoneKind::Block | RedstoneKind::Dust => {
                     if prev_signal > curr_signal {
                         *signal = 0;
-                        *texture_name = TextureName::RedstoneDust(false);
                     }
                 }
             }
@@ -345,7 +419,7 @@ fn required_input_port(blk: &Option<Block>, ind: usize) -> bool {
             input_ports[ind]
         }
         Some(Block { kind: BlockKind::Opaque { .. }, .. }) => true,
-        Some(Block { kind: BlockKind::Mechanism (Mechanism{input_ports, ..}), .. }) => {
+        Some(Block { kind: BlockKind::Mechanism(Mechanism { input_ports, .. }), .. }) => {
             input_ports[ind]
         }
         _ => false,
