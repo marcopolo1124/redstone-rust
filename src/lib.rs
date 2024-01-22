@@ -16,8 +16,8 @@ pub use mouse::*;
 mod debug;
 pub use debug::*;
 
-pub const MAP_SIZE: (usize, usize) = (30, 30);
-pub type Map = [[Option<Block>; MAP_SIZE.0]; MAP_SIZE.1];
+mod chunk;
+pub use chunk::*;
 
 pub use std::collections::HashSet;
 
@@ -51,9 +51,6 @@ const REDSTONE_DUST: Block = Block {
         kind: RedstoneKind::Dust,
     }),
 };
-
-
-
 
 const REDSTONE_TORCH: Block = Block {
     movable: false,
@@ -118,16 +115,14 @@ const STICKY_PISTON_HEAD: Block = Block {
 const TICK: f64 = 0.2;
 
 pub fn run() {
-    let world_map = [[None; MAP_SIZE.1]; MAP_SIZE.0];
-    let entity_map = [[None; MAP_SIZE.1]; MAP_SIZE.0];
+    let chunks = Chunks::new();
+
     App::new()
         .add_state::<MyStates>()
         .add_plugins(DefaultPlugins)
-        .insert_resource(WorldMap(world_map))
-        .insert_resource(EntityMap(entity_map))
-        .insert_resource(TextureMap(HashMap::new()))
+        .insert_resource(chunks)
         .insert_resource(Orientation::Up)
-        .insert_resource(EventListener::new())
+        // .insert_resource(EventListener::new())
         .insert_resource(SelectedBlock(None))
         .insert_resource(Time::<Fixed>::from_seconds(TICK))
         .add_loading_state(
@@ -140,8 +135,8 @@ pub fn run() {
         .add_systems(Update, mouse_input.run_if(in_state(MyStates::Next)))
         .add_systems(Update, zoom_camera.run_if(in_state(MyStates::Next)))
         .add_systems(Update, update_selected_block.run_if(in_state(MyStates::Next)))
-        .add_systems(FixedUpdate, (run_listeners).run_if(in_state(MyStates::Next)))
-        .add_systems(Update, entity_map_listener.run_if(in_state(MyStates::Next)))
+        // .add_systems(FixedUpdate, (run_listeners).run_if(in_state(MyStates::Next)))
+        // .add_systems(Update, entity_map_listener.run_if(in_state(MyStates::Next)))
         .add_systems(Update, update_orientation.run_if(in_state(MyStates::Next)))
         .run();
 }
@@ -153,23 +148,17 @@ enum MyStates {
     Next,
 }
 
-#[derive(Resource)]
-pub struct WorldMap([[Option<Block>; MAP_SIZE.1]; MAP_SIZE.0]);
-
 #[derive(Resource, PartialEq)]
 pub struct SelectedBlock(Option<Block>);
 
 #[derive(Component)]
 pub struct BlockComponent;
 
-#[derive(Component)]
-pub struct GridBox;
 
 pub const BOX_WIDTH: f32 = 40.0;
 fn init(
     mut commands: Commands,
-    map: Res<WorldMap>,
-    mut entity_map: ResMut<EntityMap>,
+    chunks: ResMut<Chunks>,
     image_assets: Res<ImageAssets>
 ) {
     commands.spawn(Camera2dBundle {
@@ -177,15 +166,7 @@ fn init(
         ..default()
     });
 
-    for (x, row) in map.as_ref().0.iter().enumerate() {
-        for (y, blk) in row.iter().enumerate() {
-            let sprite_bundle = get_sprite(x, y, blk, image_assets.as_ref());
-            commands.spawn(get_sprite(x, y, &None, image_assets.as_ref()));
-            let entity = commands.spawn((sprite_bundle, BlockComponent)).id();
 
-            entity_map.as_mut().0[x][y] = Some(entity);
-        }
-    }
     //println!("{:?}", map.0);
 }
 
@@ -228,8 +209,8 @@ pub fn update_orientation(
     }
 }
 
-fn run_listeners(mut listeners: ResMut<EventListener>, mut world_map: ResMut<WorldMap>) {
-    redstone_torch_delayed_listener(listeners.as_mut(), world_map.as_mut());
-    repeater_listener(listeners.as_mut(), world_map.as_mut());
-    mechanism_listener(listeners.as_mut(), world_map.as_mut());
-}
+// fn run_listeners(mut listeners: ResMut<EventListener>, mut world_map: ResMut<WorldMap>) {
+//     redstone_torch_delayed_listener(listeners.as_mut(), world_map.as_mut());
+//     repeater_listener(listeners.as_mut(), world_map.as_mut());
+//     mechanism_listener(listeners.as_mut(), world_map.as_mut());
+// }

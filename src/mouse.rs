@@ -51,13 +51,13 @@ pub fn mouse_input(
 }
 
 fn get_mouse_coord(x: f32, y: f32) -> Option<(usize, usize)> {
-    let x_coord = (MAP_SIZE.1 as f32) - ((y + BOX_WIDTH / 2.0) / BOX_WIDTH).floor() - 1.0;
+    let x_coord = (CHUNK_SIZE.1 as f32) - ((y + BOX_WIDTH / 2.0) / BOX_WIDTH).floor() - 1.0;
     let y_coord = ((x + BOX_WIDTH / 2.0) / BOX_WIDTH).floor();
     if
         0.0 <= x_coord &&
-        x_coord < (MAP_SIZE.0 as f32) &&
+        x_coord < (CHUNK_SIZE.0 as f32) &&
         0.0 <= y_coord &&
-        y_coord < (MAP_SIZE.1 as f32)
+        y_coord < (CHUNK_SIZE.1 as f32)
     {
         Some((x_coord as usize, y_coord as usize))
     } else {

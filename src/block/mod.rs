@@ -65,11 +65,11 @@ pub fn place(
                 update_port(map, x - 1, y);
                 listeners.entity_map_update.insert((x - 1, y), true);
             }
-            if y + 1 < MAP_SIZE.0 && is_redstone(map, x, y + 1) {
+            if y + 1 < CHUNK_SIZE.0 && is_redstone(map, x, y + 1) {
                 update_port(map, x, y + 1);
                 listeners.entity_map_update.insert((x, y + 1), true);
             }
-            if x + 1 < MAP_SIZE.1 && is_redstone(map, x + 1, y) {
+            if x + 1 < CHUNK_SIZE.1 && is_redstone(map, x + 1, y) {
                 update_port(map, x + 1, y);
                 listeners.entity_map_update.insert((x + 1, y), true);
             }
@@ -127,11 +127,11 @@ pub fn destroy(map: &mut Map, x: usize, y: usize, listeners: &mut EventListener)
                         update_port(map, x - 1, y);
                         listeners.entity_map_update.insert((x - 1, y), true);
                     }
-                    if y + 1 < MAP_SIZE.0 && is_redstone(map, x, y + 1) {
+                    if y + 1 < CHUNK_SIZE.0 && is_redstone(map, x, y + 1) {
                         update_port(map, x, y + 1);
                         listeners.entity_map_update.insert((x, y + 1), true);
                     }
-                    if x + 1 < MAP_SIZE.1 && is_redstone(map, x + 1, y) {
+                    if x + 1 < CHUNK_SIZE.1 && is_redstone(map, x + 1, y) {
                         update_port(map, x + 1, y);
                         listeners.entity_map_update.insert((x + 1, y), true);
                     }

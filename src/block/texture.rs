@@ -74,11 +74,7 @@ pub fn get_atlas(texture_name: TextureName, image_assets: &ImageAssets) -> Handl
 }
 
 use std::f32::consts::PI;
-#[derive(Resource)]
-pub struct TextureMap(pub HashMap<TextureName, Handle<Image>>);
 
-#[derive(Resource)]
-pub struct EntityMap(pub [[Option<Entity>; MAP_SIZE.1]; MAP_SIZE.0]);
 
 #[derive(Debug, PartialEq, Clone, Copy, Hash, Eq)]
 pub enum TextureName {
@@ -99,8 +95,10 @@ pub enum TextureName {
 }
 
 pub fn get_sprite(
-    x: usize,
-    y: usize,
+    u: usize,
+    v: usize,
+    chunk_x: i128,
+    chunk_y: i128,
     blk: &Option<Block>,
     image_assets: &ImageAssets
 ) -> SpriteSheetBundle {
@@ -112,8 +110,8 @@ pub fn get_sprite(
     let handle = get_atlas(texture_name, image_assets);
     SpriteSheetBundle {
         transform: Transform::from_xyz(
-            BOX_WIDTH * (y as f32),
-            BOX_WIDTH * ((MAP_SIZE.1 - x - 1) as f32),
+            chunk_y * CHUNK_SIZE.0 + BOX_WIDTH * (v as f32),
+            BOX_WIDTH * ((CHUNK_SIZE.1 * (1 - chunk_x) - u - 1) as f32),
             0.0
         ).with_scale(Vec3::splat(2.2)),
         sprite: TextureAtlasSprite::new(state),
@@ -236,22 +234,22 @@ pub fn update_entity_state(
     }
 }
 
-pub fn entity_map_listener(
-    mut listeners: ResMut<EventListener>,
-    map: Res<WorldMap>,
-    mut entity_map: ResMut<EntityMap>,
-    mut query: Query<
-        (&mut Transform, &mut BlockComponent, &mut Handle<TextureAtlas>, &mut TextureAtlasSprite)
-    >,
-    image_assets: Res<ImageAssets>
-) {
-    for ((x, y), update_atlas) in &listeners.entity_map_update {
-        if *update_atlas {
-            update_entity_map(*x, *y, image_assets.as_ref(), &mut entity_map, &map.0, &mut query);
-        } else{
-            update_entity_state(*x, *y, &mut entity_map, &map.0, &mut query)
-        }
+// pub fn entity_map_listener(
+//     mut listeners: ResMut<EventListener>,
+//     map: Res<WorldMap>,
+//     mut entity_map: ResMut<EntityMap>,
+//     mut query: Query<
+//         (&mut Transform, &mut BlockComponent, &mut Handle<TextureAtlas>, &mut TextureAtlasSprite)
+//     >,
+//     image_assets: Res<ImageAssets>
+// ) {
+//     for ((x, y), update_atlas) in &listeners.entity_map_update {
+//         if *update_atlas {
+//             update_entity_map(*x, *y, image_assets.as_ref(), &mut entity_map, &map.0, &mut query);
+//         } else{
+//             update_entity_state(*x, *y, &mut entity_map, &map.0, &mut query)
+//         }
        
-    }
-    listeners.entity_map_update.clear()
-}
+//     }
+//     listeners.entity_map_update.clear()
+// }

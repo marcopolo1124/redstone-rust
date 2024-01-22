@@ -74,12 +74,12 @@ pub fn update_port(map: &mut Map, x: usize, y: usize) {
         count += 1;
         orientation = Orientation::Down;
     }
-    if y + 1 < MAP_SIZE.0 && is_redstone(map, x, y + 1) {
+    if y + 1 < CHUNK_SIZE.0 && is_redstone(map, x, y + 1) {
         toggle_port(map, x, y, Orientation::Right, true);
         count += 1;
         orientation = Orientation::Left;
     }
-    if x + 1 < MAP_SIZE.1 && is_redstone(map, x + 1, y) {
+    if x + 1 < CHUNK_SIZE.1 && is_redstone(map, x + 1, y) {
         toggle_port(map, x, y, Orientation::Down, true);
         count += 1;
         orientation = Orientation::Up;
@@ -432,10 +432,10 @@ pub fn get_next(map: &Map, x: usize, y: usize, output_ports: Ports) -> Vec<(usiz
     if output_ports[0] && x > 0 && required_input_port(&map[x - 1][y], 2) {
         next_blk.push((x - 1, y));
     }
-    if output_ports[1] && y + 1 < MAP_SIZE.0 && required_input_port(&map[x][y + 1], 3) {
+    if output_ports[1] && y + 1 < CHUNK_SIZE.0 && required_input_port(&map[x][y + 1], 3) {
         next_blk.push((x, y + 1));
     }
-    if output_ports[2] && x + 1 < MAP_SIZE.1 && required_input_port(&map[x + 1][y], 0) {
+    if output_ports[2] && x + 1 < CHUNK_SIZE.1 && required_input_port(&map[x + 1][y], 0) {
         next_blk.push((x + 1, y));
     }
     if output_ports[3] && y > 0 && required_input_port(&map[x][y - 1], 1) {
@@ -485,14 +485,14 @@ pub fn get_prev_signal(
             signal_type = curr_signal_type;
         }
     }
-    if input_ports[1] && y + 1 < MAP_SIZE.0 {
+    if input_ports[1] && y + 1 < CHUNK_SIZE.0 {
         let (curr_signal, curr_signal_type) = prev_output_signal(&map[x][y + 1], 3);
         if curr_signal > signal {
             signal = curr_signal;
             signal_type = curr_signal_type;
         }
     }
-    if input_ports[2] && x + 1 < MAP_SIZE.1 {
+    if input_ports[2] && x + 1 < CHUNK_SIZE.1 {
         let (curr_signal, curr_signal_type) = prev_output_signal(&map[x + 1][y], 0);
         if curr_signal > signal {
             signal = curr_signal;
