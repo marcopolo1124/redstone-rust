@@ -43,6 +43,9 @@ impl EventListeners {
     pub fn turn_mechanism_off(&mut self, x: i128, y: i128) {
         self.mechanism_listener.insert((x, y), false);
     }
+    pub fn remove_mechanism(&mut self, x: i128, y: i128){
+        self.mechanism_listener.remove(&(x, y));
+    }
 }
 
 #[derive(Resource, PartialEq)]
@@ -113,10 +116,25 @@ const REDSTONE_TORCH: Block = Block {
     mechanism: Some(MechanismKind::RedstoneTorch),
 };
 
+const REPEATER: Block = Block {
+    movable: false,
+    orientation: Orientation::Up,
+    texture_name: TextureName::Repeater,
+    symmetric: false,
+    redstone: Some(Redstone {
+        signal: 0,
+        signal_type: Some(SignalType::Strong(true)),
+        kind: Some(RedstoneKind::Mechanism),
+        input_ports: [false, false, true, false],
+        output_ports: [true, false, false, false],
+    }),
+    mechanism: Some(MechanismKind::Repeater { countdown: -1, tick: 0 }),
+};
+
 const REDSTONE_DUST: Block = Block {
     movable: false,
     orientation: Orientation::Up,
-    texture_name: TextureName::RedstoneCross,
+    texture_name: TextureName::RedstoneDust,
     symmetric: true,
     redstone: Some(Redstone {
         signal: 0,
@@ -135,12 +153,45 @@ const PISTON: Block = Block {
     symmetric: false,
     redstone: Some(Redstone {
         signal: 0,
-        signal_type: Some(SignalType::Weak(true)),
-        kind: None,
+        signal_type: None,
+        kind: Some(RedstoneKind::Mechanism),
         input_ports: [true, true, true, true],
         output_ports: [true, true, true, true],
     }),
-    mechanism: Some(MechanismKind::Piston { extended: false }),
+    mechanism: Some(MechanismKind::Piston { extended: false, sticky: false }),
+};
+
+const PISTON_HEAD: Block = Block {
+    movable: false,
+    orientation: Orientation::Up,
+    texture_name: TextureName::PistonHead,
+    symmetric: false,
+    redstone: None,
+    mechanism: None,
+};
+
+const STICKY_PISTON: Block = Block {
+    movable: true,
+    orientation: Orientation::Up,
+    texture_name: TextureName::StickyPiston,
+    symmetric: false,
+    redstone: Some(Redstone {
+        signal: 0,
+        signal_type: None,
+        kind: Some(RedstoneKind::Mechanism),
+        input_ports: [true, true, true, true],
+        output_ports: [true, true, true, true],
+    }),
+    mechanism: Some(MechanismKind::Piston { extended: false, sticky: true }),
+};
+
+const STICKY_PISTON_HEAD: Block = Block {
+    movable: false,
+    orientation: Orientation::Up,
+    texture_name: TextureName::StickyPistonHead,
+    symmetric: false,
+    redstone: None,
+    mechanism: None,
 };
 
 fn init(mut commands: Commands) {
@@ -161,6 +212,10 @@ pub fn update_selected_block(
         selected.0 = Some(REDSTONE_DUST);
     } else if keyboard_input.pressed(KeyCode::Key4) {
         selected.0 = Some(PISTON);
+    } else if keyboard_input.pressed(KeyCode::Key5) {
+        selected.0 = Some(STICKY_PISTON);
+    } else if keyboard_input.pressed(KeyCode::Key6) {
+        selected.0 = Some(REPEATER);
     }
 }
 
@@ -181,6 +236,7 @@ pub fn update_orientation(
         *orientation = Orientation::Down;
     }
 }
+
 
 pub fn mouse_input(
     mut commands: Commands,
@@ -208,17 +264,26 @@ pub fn mouse_input(
     };
 
     if buttons.just_pressed(MouseButton::Right) {
-        println!("click at {x} {y}");
+        // println!("click at {x} {y}");
         if let Some(blk) = selected_block.get_block() {
-            if place(chunks.as_mut(), blk, *orientation, x, y, &mut listeners) {
-                update_entity(&mut commands, &mut chunks, x, y, &image_assets, &mut query)
+            if
+                !place(
+                    chunks.as_mut(),
+                    blk,
+                    *orientation,
+                    x,
+                    y,
+                    &mut listeners,
+                    &mut commands,
+                    &image_assets,
+                    &mut query
+                )
+            {
+                interact(chunks.as_mut(), x, y, &mut commands, &image_assets, &mut query);
             }
         }
     } else if buttons.just_pressed(MouseButton::Left) {
-        println!("click at {x} {y}");
-        if destroy(chunks.as_mut(), x, y, &mut listeners) {
-            update_entity(&mut commands, &mut chunks, x, y, &image_assets, &mut query)
-        }
+        destroy(chunks.as_mut(), x, y, &mut listeners, &mut commands, &image_assets, &mut query);
     }
 }
 
@@ -241,10 +306,29 @@ fn update_entity_listener(
     listeners.entity_map_update.clear();
 }
 
+fn get_connection(ports: &[bool; 4]) -> usize{
+    match *ports {
+        [true, true, true, true] => 10,
+        [false, true, true, true] => 9,
+        [true, false, true, true] => 8,
+        [true, true, false, true] => 7,
+        [true, true, true, false] => 6,
+        [false, false, true, true] => 5,
+        [false, true, false, true] => 4,
+        [false, true, true, false] => 3,
+        [true, false, false, true] => 2,
+        [true, false, true, false] => 1,
+        [true, true, false, false] => 0,
+        _ => 10
+    }
+}
+
 fn get_state(blk: Block) -> usize {
     match blk {
-        Block { redstone: Some(Redstone { signal, kind: Some(RedstoneKind::Dust), .. }), .. } => {
-            signal as usize
+        Block { redstone: Some(Redstone { signal, kind: Some(RedstoneKind::Dust), input_ports,.. }), .. } => {
+            let conn_ind = get_connection(&input_ports);
+            println!("{conn_ind}");
+            conn_ind * 16 + signal as usize
         }
         Block {
             redstone: Some(Redstone { signal, kind: Some(RedstoneKind::Mechanism), .. }),
@@ -252,6 +336,18 @@ fn get_state(blk: Block) -> usize {
             ..
         } => {
             if signal > 0 { 1 } else { 0 }
+        }
+        Block { mechanism: Some(MechanismKind::Piston { extended, .. }), .. } => {
+            if !extended { 0 } else { 1 }
+        }
+        Block {
+            redstone: Some(Redstone { signal, .. }),
+            mechanism: Some(MechanismKind::Repeater { tick, .. }),
+            ..
+        } => {
+            let col_ind = if signal > 0 { 1 } else { 0 };
+            let row_ind = tick * 2;
+            (row_ind + col_ind) as usize
         }
         _ => 0,
     }
@@ -309,7 +405,7 @@ fn update_entity(
 
         *curr_entity = None;
         chunks.delete_chunk(x, y);
-        // println!("{:?}", chunks);
+        // // println!("{:?}", chunks);
     }
 }
 
@@ -350,12 +446,47 @@ enum MyStates {
     InGame,
 }
 
-
-fn mechanism_listener(mut listeners: ResMut<EventListeners>, mut chunks: ResMut<Chunks>){
+fn mechanism_listener(
+    mut listeners: ResMut<EventListeners>,
+    mut chunks: ResMut<Chunks>,
+    mut commands: Commands,
+    image_assets: Res<ImageAssets>,
+    mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>
+) {
     let mechanism_listener = listeners.mechanism_listener.clone();
     listeners.mechanism_listener.clear();
-
-    for ((x, y), on) in mechanism_listener{
-        execute_mechanism(&mut chunks, x, y, on, &mut listeners)
+    if mechanism_listener.len() > 0{
+        //println!("{:?}", mechanism_listener);
     }
+    
+    for ((x, y), on) in mechanism_listener {
+        execute_mechanism(
+            &mut chunks,
+            x,
+            y,
+            on,
+            &mut listeners,
+            &mut commands,
+            &image_assets,
+            &mut query
+        );
+    }
+}
+
+fn interact(
+    chunks: &mut Chunks,
+    x: i128,
+    y: i128,
+    commands: &mut Commands,
+    image_assets: &ImageAssets,
+    query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
+) {
+    let blk = chunks.get_block(x, y);
+    match blk {
+        Some(Block { mechanism: Some(MechanismKind::Repeater { tick, .. }), .. }) => {
+            *tick = (*tick + 1) % 4;
+        }
+        _ => {}
+    }
+    update_entity(commands, chunks, x, y, image_assets, query)
 }

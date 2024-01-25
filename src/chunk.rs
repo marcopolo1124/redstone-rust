@@ -29,7 +29,7 @@ impl Chunk {
                     debug[idx] = 1;
                 }
             }
-            println!("{:?}", debug);
+            // println!("{:?}", debug);
         }
     }
 }
@@ -96,6 +96,23 @@ impl Chunks {
         }
     }
 
+
+    pub fn get_block_ref(&self, x: i128, y: i128) -> Option<&Block> {
+        let (chunk_coord, (u, v)) = Chunks::from_world_coord(x, y);
+        let chunk = self.0.get(&chunk_coord);
+
+        if let Some(chk) = chunk {
+            let map = &chk.map;
+            if let Some(blk) = &map[u][v] {
+                return Some(blk)
+            } else{
+                return None
+            }
+        } else {
+            return None
+        }
+    }
+
     pub fn get_maybe_block(&mut self, x: i128, y: i128) -> Option<&mut Option<Block>> {
         let (chunk_coord, (u, v)) = Chunks::from_world_coord(x, y);
         let chunk = self.0.get_mut(&chunk_coord);
@@ -122,53 +139,84 @@ impl Chunks {
     }
 
     pub fn print_chunks(&self) {
-        for (k, v) in self.0.iter() {
-            println!("chunk at {:?}", k);
+        for (_, v) in self.0.iter() {
+            // println!("chunk at {:?}", k);
             v.print_chunk();
         }
     }
 }
 
 pub fn place(
-    chunks: &mut Chunks,
+    mut chunks: &mut Chunks,
     blk: Block,
     mut orientation: Orientation,
     x: i128,
     y: i128,
-    listeners: &mut EventListeners
+    listeners: &mut EventListeners,
+    commands: &mut Commands,
+    image_assets: &ImageAssets,
+    query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) -> bool {
     let curr = chunks.get_block(x, y);
-    if let None = curr {
-        if blk.symmetric {
-            orientation = Orientation::Up;
-        }
-
-        *curr = Some(Block {
-            orientation,
-            ..blk
-        });
-
-        // chunks.print_chunks();
-
-        let prev_redstone = get_max_prev(chunks, x, y);
-        let (from_port, previous_signal, prev_signal_type) = prev_redstone;
-        propagate_signal_at(
-            chunks,
-            x,
-            y,
-            from_port,
-            previous_signal,
-            previous_signal,
-            prev_signal_type,
-            listeners
-        );
-
-        return true;
+    if let Some(_) = curr {
+        return false;
     }
-    return false;
+
+    if blk.symmetric {
+        orientation = Orientation::Up;
+    }
+
+    let redstone = if let Some(redstone) = blk.redstone {
+        Some(Redstone {
+            input_ports: orientation.rotate_ports(redstone.input_ports),
+            output_ports: orientation.rotate_ports(redstone.output_ports),
+            ..redstone
+        })
+    } else {
+        None
+    };
+
+    *curr = Some(Block {
+        orientation,
+        redstone,
+        ..blk
+    });
+
+    update_dust_ports(chunks, x, y);
+    for orientation in Orientation::iter() {
+        let (next_x, next_y) = orientation.get_next_coord(x, y);
+        update_dust_ports(chunks, next_x, next_y);
+        update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
+    }
+
+    // chunks.print_chunks();
+
+    let prev_redstone = get_max_prev(chunks, x, y);
+    let (from_port, previous_signal, prev_signal_type) = prev_redstone;
+    // println!("{:?}", prev_redstone);
+    propagate_signal_at(
+        chunks,
+        x,
+        y,
+        from_port,
+        previous_signal,
+        previous_signal,
+        prev_signal_type,
+        listeners
+    );
+    update_entity(commands, &mut chunks, x, y, image_assets, query);
+    return true;
 }
 
-pub fn destroy(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut EventListeners) -> bool {
+pub fn destroy(
+    mut chunks: &mut Chunks,
+    x: i128,
+    y: i128,
+    listeners: &mut EventListeners,
+    commands: &mut Commands,
+    image_assets: &ImageAssets,
+    query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
+) -> bool {
     let curr_blk = chunks.get_maybe_block(x, y);
     if let Some(mutref) = curr_blk {
         if
@@ -200,7 +248,19 @@ pub fn destroy(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut EventListe
                     );
                 }
             }
+        } else {
+            *mutref = None;
         }
+    }
+
+
+
+    listeners.remove_mechanism(x, y);
+    update_entity(commands, &mut chunks, x, y, image_assets, query);
+    for orientation in Orientation::iter() {
+        let (next_x, next_y) = orientation.get_next_coord(x, y);
+        update_dust_ports(chunks, next_x, next_y);
+        update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
     }
     return true;
 }
@@ -237,8 +297,8 @@ pub fn get_max_prev(
                 if let Some(blk) = mutref {
                     if let Some(Redstone { signal, output_ports, signal_type, .. }) = blk.redstone {
                         if
-                            signal > max_signal + 1 &&
-                            output_ports[port_orientation.get_opposing().to_port_idx()]
+                            output_ports[port_orientation.get_opposing().to_port_idx()] &&
+                            (signal > max_signal + 1 || (max_signal_loc == None && signal > 0))
                         {
                             max_signal = signal - 1;
                             max_signal_loc = Some(port_orientation);
@@ -272,25 +332,19 @@ pub fn propagate_signal_at(
         Some(
             Block {
                 redstone: Some(
-                    Redstone { ref mut signal, signal_type, kind, input_ports, output_ports },
+                    Redstone {
+                        ref mut signal,
+                        ref mut signal_type,
+                        kind,
+                        input_ports,
+                        output_ports,
+                    },
                 ),
                 ..
             },
         ) => (signal, signal_type, kind, input_ports, output_ports),
         _ => {
             return;
-        }
-    };
-    let output_signal_type = match signal_type {
-        Some(signal_type) => signal_type,
-        None => {
-            match prev_signal_type {
-                Some(SignalType::Strong(true)) => SignalType::Strong(false),
-                Some(SignalType::Weak(true)) => SignalType::Weak(false),
-                _ => {
-                    return;
-                }
-            }
         }
     };
 
@@ -306,6 +360,8 @@ pub fn propagate_signal_at(
                 // this doesn't return and will continue
                 if let Some(SignalType::Weak(false)) = prev_signal_type {
                     return;
+                } else if let None = prev_signal_type {
+                    return;
                 }
             }
             Some(RedstoneKind::Mechanism) => {
@@ -314,8 +370,14 @@ pub fn propagate_signal_at(
                 } else {
                     listeners.turn_mechanism_off(x, y);
                 }
-
-                return;
+            }
+            None => {
+                match prev_signal_type {
+                    Some(SignalType::Weak(false)) | Some(SignalType::Strong(false)) => {
+                        return;
+                    }
+                    _ => {}
+                }
             }
             _ => {
                 return;
@@ -326,6 +388,43 @@ pub fn propagate_signal_at(
     //input signal > current signal -> turning on
     // previous signal > current signal -> can be either turning on or off
     if input_signal >= *signal || (previous_signal >= *signal && *signal > 0) {
+        let output_signal_type = match *signal_type {
+            Some(curr_signal_type) => {
+                // redstone sources can only have their signal set externally and no
+                if let SignalType::Strong(true) = curr_signal_type {
+                    if let Some(_) = from_port {
+                        return;
+                    }
+                }
+
+                if
+                    input_signal == 0 &&
+                    ((curr_signal_type == SignalType::Weak(false) &&
+                        prev_signal_type == Some(SignalType::Weak(true))) ||
+                        (curr_signal_type == SignalType::Strong(false) &&
+                            prev_signal_type == Some(SignalType::Strong(true))))
+                {
+                    *signal_type = None;
+                }
+                curr_signal_type
+            }
+            None => {
+                match prev_signal_type {
+                    Some(SignalType::Strong(true)) => {
+                        *signal_type = Some(SignalType::Strong(false));
+                        SignalType::Strong(false)
+                    }
+                    Some(SignalType::Weak(true)) => {
+                        *signal_type = Some(SignalType::Weak(false));
+                        SignalType::Weak(false)
+                    }
+                    _ => {
+                        return;
+                    }
+                }
+            }
+        };
+        // println!("output type {:?} {input_signal} {previous_signal} {}", output_signal_type, *signal);
         // the equality is only valid for cases where the entity is lit up by the system
         // The cases are when a mechanism can propagate siganl and is lit up by external circumstances
         // None in from_port means that the entity is lighting itself up
@@ -360,6 +459,7 @@ pub fn propagate_signal_at(
 
     if input_signal == 0 {
         let prev_redstone = get_max_prev(chunks, x, y);
+        // println!("back {:?}", prev_redstone);
         let (from_port, previous_signal, prev_signal_type) = prev_redstone;
         propagate_signal_at(
             chunks,
@@ -374,7 +474,16 @@ pub fn propagate_signal_at(
     }
 }
 
-pub fn execute_mechanism(chunks: &mut Chunks, x: i128, y: i128, on: bool, listeners: &mut EventListeners) {
+pub fn execute_mechanism(
+    chunks: &mut Chunks,
+    x: i128,
+    y: i128,
+    on: bool,
+    listeners: &mut EventListeners,
+    mut commands: &mut Commands,
+    image_assets: &ImageAssets,
+    query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
+) {
     let maybe_blk = chunks.get_block(x, y);
     let blk = if let Some(blk) = maybe_blk {
         blk
@@ -382,34 +491,137 @@ pub fn execute_mechanism(chunks: &mut Chunks, x: i128, y: i128, on: bool, listen
         return;
     };
 
-    let Block { orientation, mechanism, .. } = *blk;
+    let Block { orientation, mechanism, redstone, .. } = blk;
     let mechanism_kind = if let Some(mechanism_kind) = mechanism {
         mechanism_kind
     } else {
         return;
     };
 
-    match mechanism_kind{
+    let orientation = *orientation;
+    let redstone = *redstone;
+
+    match mechanism_kind {
         MechanismKind::RedstoneTorch => {
-            if on {
+            let signal = if let Some(Redstone { signal, .. }) = redstone {
+                signal
+            } else {
+                return;
+            };
+            if on && signal > 0 {
+                // println!("turning off");
                 propagate_signal_at(chunks, x, y, None, 0, 16, None, listeners)
-            } else{
+            } else if !on && signal <= 0 {
+                // println!("turning on");
                 propagate_signal_at(chunks, x, y, None, 16, 16, None, listeners)
             }
-            
-        },
-        MechanismKind::Piston{extended} => {
-            if extended && !on {
+        }
+        MechanismKind::Piston { ref mut extended, sticky } => {
+            let is_sticky = *sticky;
+            let piston_head = if is_sticky { STICKY_PISTON_HEAD } else { PISTON_HEAD };
+            if !*extended && on {
+                // println!("moved");
                 let (next_x, next_y) = orientation.get_next_coord(x, y);
-                move_blocks(chunks, next_x, next_y, orientation, 20, listeners);
-            } else if !extended && on{
-                
+                *extended = true;
+                if
+                    move_blocks(
+                        chunks,
+                        next_x,
+                        next_y,
+                        orientation,
+                        20,
+                        listeners,
+                        &mut commands,
+                        &image_assets,
+                        query
+                    )
+                {
+                    place(
+                        chunks,
+                        piston_head,
+                        orientation,
+                        next_x,
+                        next_y,
+                        listeners,
+                        &mut commands,
+                        &image_assets,
+                        query
+                    );
+                    listeners.update_entity(x, y);
+                }
+            } else if *extended && !on {
+                // println!("retract here");
+                *extended = false;
+                listeners.update_entity(x, y);
+                let (next_x, next_y) = orientation.get_next_coord(x, y);
+                let next_block = chunks.get_block(next_x, next_y);
+                if let Some(blk) = next_block {
+                    if blk.texture_name == piston_head.texture_name {
+                        destroy(
+                            chunks,
+                            next_x,
+                            next_y,
+                            listeners,
+                            &mut commands,
+                            &image_assets,
+                            query
+                        );
+                    }
+                }
+                if is_sticky {
+                    let (next_next_x, next_next_y) = orientation.get_next_coord(next_x, next_y);
+                    let pull_dir = orientation.get_opposing();
+                    move_blocks(
+                        chunks,
+                        next_next_x,
+                        next_next_y,
+                        pull_dir,
+                        20,
+                        listeners,
+                        &mut commands,
+                        &image_assets,
+                        query
+                    );
+                }
             }
         }
-        _ => {}
+        MechanismKind::Repeater { countdown, tick } => {
+            let signal = if let Some(Redstone { signal, .. }) = redstone {
+                signal
+            } else {
+                return;
+            };
+
+            if *countdown < 0 {
+                if (on && signal <= 0) || (!on && signal > 0) {
+                    *countdown = *tick;
+                }
+            }
+
+            if *countdown > 0 {
+                *countdown -= 1;
+                if on {
+                    listeners.turn_mechanism_on(x, y);
+                } else {
+                    listeners.turn_mechanism_off(x, y);
+                }
+            } else if *countdown == 0 {
+                *countdown -= 1;
+                if signal <= 0 {
+                    propagate_signal_at(chunks, x, y, None, 16, 16, None, listeners);
+                    if !on {
+                        listeners.turn_mechanism_off(x, y)
+                    }
+                } else {
+                    propagate_signal_at(chunks, x, y, None, 0, 16, None, listeners);
+                    if on {
+                        listeners.turn_mechanism_on(x, y)
+                    }
+                }
+            }
+        }
     }
 }
-
 
 fn move_blocks(
     chunks: &mut Chunks,
@@ -417,29 +629,131 @@ fn move_blocks(
     y: i128,
     orientation: Orientation,
     strength: usize,
-    listeners: &mut EventListeners
+    listeners: &mut EventListeners,
+    mut commands: &mut Commands,
+    image_assets: &ImageAssets,
+    query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) -> bool {
+    // println!("called moved blocks");
     if strength <= 0 {
-        return false
+        // println!("no strength");
+        return false;
     }
 
     let maybe_blk = chunks.get_block(x, y);
     let blk = if let Some(blk) = maybe_blk {
-        if blk.movable{
+        if blk.movable {
             *blk
-        } else{
+        } else {
+            // println!("block not movable");
             return false;
         }
-    } else{
-        return true
+    } else {
+        // println!("none");
+        return true;
     };
 
     let (next_x, next_y) = orientation.get_next_coord(x, y);
-    let moved = move_blocks(chunks, next_x, next_y, orientation, strength, listeners);
+    let moved = move_blocks(
+        chunks,
+        next_x,
+        next_y,
+        orientation,
+        strength - 1,
+        listeners,
+        &mut commands,
+        &image_assets,
+        query
+    );
     if moved {
-        place(chunks, blk, blk.orientation, next_x, next_y, listeners);
-        destroy(chunks, x, y, listeners);
-    };
+        // println!("place and destroy");
+        place(
+            chunks,
+            blk,
+            blk.orientation,
+            next_x,
+            next_y,
+            listeners,
+            &mut commands,
+            &image_assets,
+            query
+        );
+        destroy(chunks, x, y, listeners, &mut commands, &image_assets, query);
+        listeners.update_entity(x, y);
+    }
 
     moved
+}
+
+pub fn is_redstone(chunks: &Chunks, x: i128, y: i128) -> bool{
+    let maybe_blk = chunks.get_block_ref(x, y);
+    let blk = if let Some(blk) = maybe_blk {
+        blk
+    } else {
+        return false;
+    };
+
+    let redstone = if let Block { redstone: Some(redstone), .. } = blk {
+        redstone
+    } else {
+        return false;
+    };
+    if redstone.signal_type == Some(SignalType::Strong(true)) || redstone.signal_type == Some(SignalType::Weak(true)){
+        true
+    } else{
+        false
+    }
+}
+
+pub fn get_redstone_dust(chunks: &mut Chunks, x: i128, y: i128) -> Option<&mut Redstone> {
+    let maybe_blk = chunks.get_block(x, y);
+    let blk = if let Some(blk) = maybe_blk {
+        blk
+    } else {
+        return None;
+    };
+
+    let redstone = if let Block { redstone: Some(redstone), .. } = blk {
+        redstone
+    } else {
+        return None;
+    };
+
+    if redstone.kind != Some(RedstoneKind::Dust) {
+        return None;
+    }
+
+    Some(redstone)
+}
+
+fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128) {
+    let mut last_orientation = Orientation::Up;
+    let mut count = 0;
+    for orientation in Orientation::iter() {
+        let (next_x, next_y) = orientation.get_next_coord(x, y);
+        let is_dust = is_redstone(chunks, next_x, next_y);
+        let redstone = get_redstone_dust(chunks, x, y);
+        let redstone_dust = if let Some(redstone_dust) = redstone {
+            redstone_dust
+        } else {
+            return;
+        };
+        toggle_port(redstone_dust, orientation, false);
+        
+        if is_dust {
+            toggle_port(redstone_dust, orientation, true);
+            last_orientation = orientation;
+            count += 1
+        }
+    }
+
+    if count == 1{
+        let redstone = get_redstone_dust(chunks, x, y);
+        let redstone_dust = if let Some(redstone_dust) = redstone {
+            redstone_dust
+        } else {
+            return;
+        };
+        toggle_port(redstone_dust, last_orientation.get_opposing(), true);
+    }
 }

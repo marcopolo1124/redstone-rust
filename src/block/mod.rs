@@ -22,9 +22,14 @@ pub struct Redstone {
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum MechanismKind {
     RedstoneTorch,
-    Repeater,
-    Piston{extended: bool},
-    StickyPiston{extended: bool},
+    Repeater {
+        countdown: i8,
+        tick: i8,
+    },
+    Piston {
+        extended: bool,
+        sticky: bool,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -89,7 +94,30 @@ impl Orientation {
             panic!("port_idx must be < 4 and >= 0")
         }
     }
+
+    pub fn rotate_ports(&self, ports: [bool; 4]) -> [bool; 4] {
+        let rotate_amount = match self {
+            Orientation::Up => 0,
+            Orientation::Right => 1,
+            Orientation::Down => 2,
+            Orientation::Left => 3,
+        };
+        let mut oriented_ports = ports.clone();
+        oriented_ports.rotate_right(rotate_amount);
+        oriented_ports
+    }
+
+    pub fn iter() -> [Orientation; 4] {
+        [Orientation::Up, Orientation::Right, Orientation::Down, Orientation::Left]
+    }
 }
 
 #[derive(Component)]
 pub struct BlockComponent;
+
+pub fn toggle_port(redstone: &mut Redstone, orientation: Orientation, on: bool){
+    let Redstone{input_ports, output_ports, ..} = redstone;
+    let idx = orientation.to_port_idx();
+    input_ports[idx] = on;
+    output_ports[idx] = on;
+}
