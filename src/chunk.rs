@@ -471,6 +471,16 @@ pub fn propagate_signal_at(
     }
 }
 
+
+fn get_extended(chunks: &mut Chunks, x: i128, y:i128) -> Option<&mut bool>{
+    let blk = chunks.get_block(x, y);
+    if let Some(Block{mechanism: Some(MechanismKind::Piston { ref mut extended, .. }),..}) = blk {
+        Some(extended)
+    } else{
+        None
+    }
+}
+
 pub fn execute_mechanism(
     chunks: &mut Chunks,
     x: i128,
@@ -519,20 +529,21 @@ pub fn execute_mechanism(
             if !*extended && on {
                 // println!("moved");
                 let (next_x, next_y) = orientation.get_next_coord(x, y);
-                *extended = true;
-                if
-                    move_blocks(
-                        chunks,
-                        next_x,
-                        next_y,
-                        orientation,
-                        20,
-                        listeners,
-                        &mut commands,
-                        &image_assets,
-                        query
-                    )
-                {
+                let moved = move_blocks(
+                    chunks,
+                    next_x,
+                    next_y,
+                    orientation,
+                    20,
+                    listeners,
+                    &mut commands,
+                    &image_assets,
+                    query
+                );
+                if moved {
+                    if let Some(extended) = get_extended(chunks, x, y){
+                        *extended = true;
+                    }
                     place(
                         chunks,
                         piston_head,
@@ -547,7 +558,6 @@ pub fn execute_mechanism(
                     listeners.update_entity(x, y);
                 }
             } else if *extended && !on {
-                // println!("retract here");
                 *extended = false;
                 listeners.update_entity(x, y);
                 let (next_x, next_y) = orientation.get_next_coord(x, y);
