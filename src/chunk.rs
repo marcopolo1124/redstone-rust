@@ -96,7 +96,6 @@ impl Chunks {
         }
     }
 
-
     pub fn get_block_ref(&self, x: i128, y: i128) -> Option<&Block> {
         let (chunk_coord, (u, v)) = Chunks::from_world_coord(x, y);
         let chunk = self.0.get(&chunk_coord);
@@ -104,12 +103,12 @@ impl Chunks {
         if let Some(chk) = chunk {
             let map = &chk.map;
             if let Some(blk) = &map[u][v] {
-                return Some(blk)
-            } else{
-                return None
+                return Some(blk);
+            } else {
+                return None;
             }
         } else {
-            return None
+            return None;
         }
     }
 
@@ -182,10 +181,10 @@ pub fn place(
         ..blk
     });
 
-    update_dust_ports(chunks, x, y);
+    update_dust_ports(chunks, x, y, listeners);
     for orientation in Orientation::iter() {
         let (next_x, next_y) = orientation.get_next_coord(x, y);
-        update_dust_ports(chunks, next_x, next_y);
+        update_dust_ports(chunks, next_x, next_y, listeners);
         update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
     }
 
@@ -253,13 +252,11 @@ pub fn destroy(
         }
     }
 
-
-
     listeners.remove_mechanism(x, y);
     update_entity(commands, &mut chunks, x, y, image_assets, query);
     for orientation in Orientation::iter() {
         let (next_x, next_y) = orientation.get_next_coord(x, y);
-        update_dust_ports(chunks, next_x, next_y);
+        update_dust_ports(chunks, next_x, next_y, listeners);
         update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
     }
     return true;
@@ -685,7 +682,7 @@ fn move_blocks(
     moved
 }
 
-pub fn is_redstone(chunks: &Chunks, x: i128, y: i128) -> bool{
+pub fn is_redstone(chunks: &Chunks, x: i128, y: i128) -> bool {
     let maybe_blk = chunks.get_block_ref(x, y);
     let blk = if let Some(blk) = maybe_blk {
         blk
@@ -698,9 +695,12 @@ pub fn is_redstone(chunks: &Chunks, x: i128, y: i128) -> bool{
     } else {
         return false;
     };
-    if redstone.signal_type == Some(SignalType::Strong(true)) || redstone.signal_type == Some(SignalType::Weak(true)){
+    if
+        redstone.signal_type == Some(SignalType::Strong(true)) ||
+        redstone.signal_type == Some(SignalType::Weak(true))
+    {
         true
-    } else{
+    } else {
         false
     }
 }
@@ -726,7 +726,7 @@ pub fn get_redstone_dust(chunks: &mut Chunks, x: i128, y: i128) -> Option<&mut R
     Some(redstone)
 }
 
-fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128) {
+fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut EventListeners) {
     let mut last_orientation = Orientation::Up;
     let mut count = 0;
     for orientation in Orientation::iter() {
@@ -738,22 +738,50 @@ fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128) {
         } else {
             return;
         };
+
         toggle_port(redstone_dust, orientation, false);
-        
+
         if is_dust {
             toggle_port(redstone_dust, orientation, true);
             last_orientation = orientation;
-            count += 1
+            count += 1;
+        } else {
+            let signal = redstone_dust.signal;
+            let prev_signal_type = redstone_dust.signal_type;
+            propagate_signal_at(
+                chunks,
+                next_x,
+                next_y,
+                Some(orientation),
+                0,
+                signal,
+                prev_signal_type,
+                listeners
+            );
         }
     }
 
-    if count == 1{
+    if count == 1 {
         let redstone = get_redstone_dust(chunks, x, y);
         let redstone_dust = if let Some(redstone_dust) = redstone {
             redstone_dust
         } else {
             return;
         };
-        toggle_port(redstone_dust, last_orientation.get_opposing(), true);
+        let opposing_port = last_orientation.get_opposing();
+        let signal = redstone_dust.signal;
+        let prev_signal_type = redstone_dust.signal_type;
+        let (next_x, next_y) = opposing_port.get_next_coord(x, y);
+        toggle_port(redstone_dust, opposing_port, true);
+        propagate_signal_at(
+            chunks,
+            next_x,
+            next_y,
+            Some(opposing_port),
+            signal,
+            signal,
+            prev_signal_type,
+            listeners
+        );
     }
 }

@@ -327,7 +327,7 @@ fn get_state(blk: Block) -> usize {
     match blk {
         Block { redstone: Some(Redstone { signal, kind: Some(RedstoneKind::Dust), input_ports,.. }), .. } => {
             let conn_ind = get_connection(&input_ports);
-            println!("{conn_ind}");
+            // println!("{conn_ind}");
             conn_ind * 16 + signal as usize
         }
         Block {
