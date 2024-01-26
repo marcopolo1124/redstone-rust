@@ -11,12 +11,12 @@ pub fn propagate_signal_at(
     listeners: &mut EventListeners,
     from_list: bool
 ) {
-    // println!("should {x} {y} {:?}", prev_signal_type);
+    
     if input_signal <= 0 && previous_signal <= 1 {
         return;
     }
 
-    // println!("could");
+    
 
     let curr_blk = chunks.get_block(x, y);
 
@@ -43,6 +43,7 @@ pub fn propagate_signal_at(
     // Cases are: Weak signal from opaque block going to redstone dust
     // triggering a mechanism. In cases of redstone torch it will propagate on the next tick
     // println!("called {:?}", from_port);
+    // println!("should {x} {y} {:?} {:?}", prev_signal_type, from_port);
     if let Some(from_port) = from_port {
         if !input_ports[from_port.to_port_idx()] {
             // println!("port idx problem");

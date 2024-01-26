@@ -87,6 +87,8 @@ pub fn execute_mechanism(
                         query
                     );
                     listeners.update_entity(x, y);
+                } else{
+                    listeners.turn_mechanism_on(x, y)
                 }
             } else if *extended && !on {
                 *extended = false;

@@ -6,11 +6,10 @@ pub use block::*;
 
 use bevy::utils::HashMap;
 
-pub const CHUNK_SIZE: (i128, i128) = (16, 16);
+pub const CHUNK_SIZE: (i128, i128) = (3, 3);
 
 pub type Map = [[Option<Block>; CHUNK_SIZE.0 as usize]; CHUNK_SIZE.1 as usize];
 pub type EntityMap = [[Option<Entity>; CHUNK_SIZE.1 as usize]; CHUNK_SIZE.0 as usize];
-
 #[derive(Debug, Clone, Copy)]
 pub struct Chunk {
     map: Map,
@@ -187,31 +186,38 @@ pub fn place(
         ..blk
     });
 
-    update_dust_ports(chunks, x, y, listeners);
-    for orientation in Orientation::iter() {
-        let (next_x, next_y) = orientation.get_next_coord(x, y);
-        update_dust_ports(chunks, next_x, next_y, listeners);
-        update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
+    
+
+    if let Some(_) = redstone{
+        update_dust_ports(chunks, x, y, listeners);
+        
+        for orientation in Orientation::iter() {
+            let (next_x, next_y) = orientation.get_next_coord(x, y);
+            update_dust_ports(chunks, next_x, next_y, listeners);
+            update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
+        }
+    
+        // chunks.print_chunks();
+    
+        let prev_redstone = get_max_prev(chunks, x, y);
+        let (from_port, previous_signal, prev_signal_type) = prev_redstone;
+        let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
+        // println!("prev redstone 2{:?}", prev_redstone);
+        propagate_signal_at(
+            chunks,
+            x,
+            y,
+            from_port,
+            transmitted_signal,
+            previous_signal,
+            prev_signal_type,
+            listeners,
+            false
+        );
     }
-
-    // chunks.print_chunks();
-
-    let prev_redstone = get_max_prev(chunks, x, y);
-    let (from_port, previous_signal, prev_signal_type) = prev_redstone;
-    let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
-    // println!("prev redstone 2{:?}", prev_redstone);
-    propagate_signal_at(
-        chunks,
-        x,
-        y,
-        from_port,
-        transmitted_signal,
-        previous_signal,
-        prev_signal_type,
-        listeners,
-        false
-    );
+    
     update_entity(commands, &mut chunks, x, y, image_assets, query);
+    
     return true;
 }
 
@@ -225,6 +231,7 @@ pub fn destroy(
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) -> bool {
     // println!("");
+    // println!("destroy {x} {y}");
     let curr_blk = chunks.get_maybe_block(x, y);
     if let Some(mutref) = curr_blk {
         if
@@ -236,6 +243,7 @@ pub fn destroy(
             let curr_signal_type = *signal_type;
             let curr_output_ports = *output_ports;
             *mutref = None;
+            update_entity(commands, &mut chunks, x, y, image_assets, query);
             // chunks.print_chunks();
             // let transmitted_signal = if curr_signal < 1 { 0 } else { curr_signal - 1 };
 
@@ -257,18 +265,20 @@ pub fn destroy(
                     );
                 }
             }
+            for orientation in Orientation::iter() {
+                let (next_x, next_y) = orientation.get_next_coord(x, y);
+                update_dust_ports(chunks, next_x, next_y, listeners);
+                update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
+            }
         } else {
             *mutref = None;
+            update_entity(commands, &mut chunks, x, y, image_assets, query);
         }
     }
 
     listeners.remove_mechanism(x, y);
-    update_entity(commands, &mut chunks, x, y, image_assets, query);
-    for orientation in Orientation::iter() {
-        let (next_x, next_y) = orientation.get_next_coord(x, y);
-        update_dust_ports(chunks, next_x, next_y, listeners);
-        update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
-    }
+    
+    // println!("update");
     return true;
 }
 

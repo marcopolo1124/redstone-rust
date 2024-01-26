@@ -358,8 +358,10 @@ fn update_entity(
     image_assets: &ImageAssets,
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) {
+    // println!("{:?}", chunks);
     let curr_blk = chunks.get_block(x, y).clone();
     let curr_entity = chunks.get_entity(x, y);
+    
 
     if let Some(blk) = curr_blk {
         let Block { texture_name, orientation, .. } = blk;
@@ -396,6 +398,7 @@ fn update_entity(
             *curr_entity = Some(handle);
         }
     } else {
+        // println!("entity deleting {x} {y} {:?}", curr_entity);
         if let Some(entity_handle) = curr_entity {
             commands.entity(*entity_handle).despawn();
         }
