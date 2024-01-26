@@ -155,8 +155,8 @@ const PISTON: Block = Block {
         signal: 0,
         signal_type: None,
         kind: Some(RedstoneKind::Mechanism),
-        input_ports: [true, true, true, true],
-        output_ports: [true, true, true, true],
+        input_ports: [false, true, true, true],
+        output_ports: [false, false, false, false],
     }),
     mechanism: Some(MechanismKind::Piston { extended: false, sticky: false }),
 };
@@ -179,8 +179,8 @@ const STICKY_PISTON: Block = Block {
         signal: 0,
         signal_type: None,
         kind: Some(RedstoneKind::Mechanism),
-        input_ports: [true, true, true, true],
-        output_ports: [true, true, true, true],
+        input_ports: [false, true, true, true],
+        output_ports: [false, false, false, false],
     }),
     mechanism: Some(MechanismKind::Piston { extended: false, sticky: true }),
 };
