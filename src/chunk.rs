@@ -157,6 +157,7 @@ pub fn place(
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) -> bool {
     println!("");
+    println!("place");
     let curr = chunks.get_block(x, y);
     if let Some(_) = curr {
         return false;
@@ -182,7 +183,7 @@ pub fn place(
         ..blk
     });
 
-    update_dust_ports(chunks, x, y, listeners);
+        update_dust_ports(chunks, x, y, listeners);
     for orientation in Orientation::iter() {
         let (next_x, next_y) = orientation.get_next_coord(x, y);
         update_dust_ports(chunks, next_x, next_y, listeners);
@@ -192,14 +193,15 @@ pub fn place(
     // chunks.print_chunks();
 
     let prev_redstone = get_max_prev(chunks, x, y);
-    let (from_port, previous_signal, prev_signal_type) = prev_redstone;
+        let (from_port, previous_signal, prev_signal_type) = prev_redstone;
+    let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
     // println!("{:?}", prev_redstone);
     propagate_signal_at(
         chunks,
         x,
         y,
         from_port,
-        previous_signal,
+        transmitted_signal,
         previous_signal,
         prev_signal_type,
         listeners,
@@ -246,8 +248,8 @@ pub fn destroy(
                         0,
                         curr_signal,
                         curr_signal_type,
-                        listeners
-                        , false
+                        listeners,
+                        false
                     );
                 }
             }
@@ -285,7 +287,7 @@ pub fn get_max_prev(
             return (None, 0, None);
         }
     };
-    let mut max_signal = signal;
+    let mut max_signal = signal + 1;
     let mut max_signal_loc: Option<Orientation> = None;
     let mut max_signal_type = signal_type;
 
@@ -299,9 +301,9 @@ pub fn get_max_prev(
                     if let Some(Redstone { signal, output_ports, signal_type, .. }) = blk.redstone {
                         if
                             output_ports[port_orientation.get_opposing().to_port_idx()] &&
-                            (signal > max_signal + 1 || (max_signal_loc == None && signal > 0))
+                            (signal > max_signal || (max_signal_loc == None && signal > 0))
                         {
-                            max_signal = signal - 1;
+                            max_signal = signal;
                             max_signal_loc = Some(port_orientation);
                             max_signal_type = signal_type;
                         }
@@ -388,14 +390,15 @@ pub fn propagate_signal_at(
 
     //input signal > current signal -> turning on
     // previous signal > current signal -> can be either turning on or off
-    if input_signal >= *signal || (previous_signal == *signal + 1 && *signal > 0 && input_signal == 0) {
-        
+    if
+        input_signal >= *signal ||
+        (previous_signal == *signal + 1 && *signal > 0 && input_signal == 0)
+    {
         if let Some(_) = from_port {
-            if input_signal == *signal && input_signal > 0{
+            if input_signal == *signal && input_signal > 0 {
                 return;
             }
         }
-        // println!("i2nput {input_signal} prev {previous_signal} sig {signal} list {from_list} pos {x} {y}");
         let output_signal_type = match *signal_type {
             Some(curr_signal_type) => {
                 // redstone sources can only have their signal set externally
@@ -468,12 +471,13 @@ pub fn propagate_signal_at(
         let prev_redstone = get_max_prev(chunks, x, y);
         // println!("back {:?}", prev_redstone);
         let (from_port, previous_signal, prev_signal_type) = prev_redstone;
+        let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
         propagate_signal_at(
             chunks,
             x,
             y,
             from_port,
-            previous_signal,
+            transmitted_signal,
             previous_signal,
             prev_signal_type,
             listeners,
@@ -482,12 +486,14 @@ pub fn propagate_signal_at(
     }
 }
 
-
-fn get_extended(chunks: &mut Chunks, x: i128, y:i128) -> Option<&mut bool>{
+fn get_extended(chunks: &mut Chunks, x: i128, y: i128) -> Option<&mut bool> {
     let blk = chunks.get_block(x, y);
-    if let Some(Block{mechanism: Some(MechanismKind::Piston { ref mut extended, .. }),..}) = blk {
+    if
+        let Some(Block { mechanism: Some(MechanismKind::Piston { ref mut extended, .. }), .. }) =
+            blk
+    {
         Some(extended)
-    } else{
+    } else {
         None
     }
 }
@@ -552,7 +558,7 @@ pub fn execute_mechanism(
                     query
                 );
                 if moved {
-                    if let Some(extended) = get_extended(chunks, x, y){
+                    if let Some(extended) = get_extended(chunks, x, y) {
                         *extended = true;
                     }
                     place(
@@ -631,7 +637,7 @@ pub fn execute_mechanism(
                         listeners.turn_mechanism_off(x, y)
                     }
                 } else {
-                    propagate_signal_at(chunks, x, y, None, 0, 16, None, listeners, true);
+                    propagate_signal_at(chunks, x, y, None, 0, 17, None, listeners, true);
                     if on {
                         listeners.turn_mechanism_on(x, y)
                     }
@@ -792,6 +798,7 @@ fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut Even
         };
         let opposing_port = last_orientation.get_opposing();
         let signal = redstone_dust.signal;
+        let transmitted_signal = if signal > 0{ signal - 1} else {0};
         let prev_signal_type = redstone_dust.signal_type;
         let (next_x, next_y) = opposing_port.get_next_coord(x, y);
         toggle_port(redstone_dust, opposing_port, true);
@@ -800,7 +807,7 @@ fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut Even
             next_x,
             next_y,
             Some(opposing_port),
-            signal,
+            transmitted_signal,
             signal,
             prev_signal_type,
             listeners,
