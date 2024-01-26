@@ -156,8 +156,8 @@ pub fn place(
     image_assets: &ImageAssets,
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) -> bool {
-    println!("");
-    println!("place");
+    // println!("");
+    // println!("place");
     let curr = chunks.get_block(x, y);
     if let Some(_) = curr {
         return false;
@@ -183,7 +183,7 @@ pub fn place(
         ..blk
     });
 
-        update_dust_ports(chunks, x, y, listeners);
+    update_dust_ports(chunks, x, y, listeners);
     for orientation in Orientation::iter() {
         let (next_x, next_y) = orientation.get_next_coord(x, y);
         update_dust_ports(chunks, next_x, next_y, listeners);
@@ -193,9 +193,9 @@ pub fn place(
     // chunks.print_chunks();
 
     let prev_redstone = get_max_prev(chunks, x, y);
-        let (from_port, previous_signal, prev_signal_type) = prev_redstone;
+    let (from_port, previous_signal, prev_signal_type) = prev_redstone;
     let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
-    // println!("{:?}", prev_redstone);
+    // println!("prev redstone 2{:?}", prev_redstone);
     propagate_signal_at(
         chunks,
         x,
@@ -220,7 +220,7 @@ pub fn destroy(
     image_assets: &ImageAssets,
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) -> bool {
-    println!("");
+    // println!("");
     let curr_blk = chunks.get_maybe_block(x, y);
     if let Some(mutref) = curr_blk {
         if
@@ -284,30 +284,40 @@ pub fn get_max_prev(
         Some(Block { redstone: Some(Redstone { signal, input_ports, signal_type, .. }), .. }) =>
             (*signal, input_ports.clone(), *signal_type),
         _ => {
+            // println!("why the fuck");
             return (None, 0, None);
         }
     };
+
     let mut max_signal = signal + 1;
     let mut max_signal_loc: Option<Orientation> = None;
     let mut max_signal_type = signal_type;
 
     for (idx, port) in input_ports.iter().enumerate() {
+        // println!("{}", *port);
+        
         if *port {
             let port_orientation = Orientation::port_idx_to_orientation(idx);
             let (next_x, next_y) = port_orientation.get_next_coord(x, y);
             let next_blk = chunks.get_maybe_block(next_x, next_y);
-            if let Some(mutref) = next_blk {
-                if let Some(blk) = mutref {
-                    if let Some(Redstone { signal, output_ports, signal_type, .. }) = blk.redstone {
-                        if
-                            output_ports[port_orientation.get_opposing().to_port_idx()] &&
-                            (signal > max_signal || (max_signal_loc == None && signal > 0))
-                        {
-                            max_signal = signal;
-                            max_signal_loc = Some(port_orientation);
-                            max_signal_type = signal_type;
-                        }
-                    }
+            if
+                let Some(
+                    Some(
+                        Block {
+                            redstone: Some(Redstone { signal, output_ports, signal_type, .. }),
+                            ..
+                        },
+                    ),
+                ) = next_blk
+            {
+                // println!("comp {} {max_signal}", *signal);
+                if
+                    output_ports[port_orientation.get_opposing().to_port_idx()] &&
+                    (*signal > max_signal || (max_signal_loc == None && *signal > 0))
+                {
+                    max_signal = *signal;
+                    max_signal_loc = Some(port_orientation);
+                    max_signal_type = *signal_type;
                 }
             }
         }
@@ -326,9 +336,12 @@ pub fn propagate_signal_at(
     listeners: &mut EventListeners,
     from_list: bool
 ) {
+    // println!("should {x} {y} {:?}", prev_signal_type);
     if input_signal <= 0 && previous_signal <= 1 {
         return;
     }
+
+    // println!("could");
 
     let curr_blk = chunks.get_block(x, y);
 
@@ -354,16 +367,23 @@ pub fn propagate_signal_at(
     // if there is an input signal, filter out all signals that will not continue propagation
     // Cases are: Weak signal from opaque block going to redstone dust
     // triggering a mechanism. In cases of redstone torch it will propagate on the next tick
+    // println!("called {:?}", from_port);
     if let Some(from_port) = from_port {
         if !input_ports[from_port.to_port_idx()] {
+            // println!("port idx problem");
             return;
         }
+        // println!("kind {:?}", kind);
         match kind {
             Some(RedstoneKind::Dust) => {
+                // println!("prev signal type {:?}", prev_signal_type);
                 // this doesn't return and will continue
+                // println!("{:?}", prev_signal_type);
                 if let Some(SignalType::Weak(false)) = prev_signal_type {
+                    // println!("returned weak");
                     return;
                 } else if let None = prev_signal_type {
+                    // println!("returned none");
                     return;
                 }
             }
@@ -377,9 +397,12 @@ pub fn propagate_signal_at(
             None => {
                 match prev_signal_type {
                     Some(SignalType::Weak(false)) | Some(SignalType::Strong(false)) => {
+                        // println!("false gods");
                         return;
                     }
-                    _ => {}
+                    _ => {
+                        // println!("{:?}", prev_signal_type);
+                    }
                 }
             }
             _ => {
@@ -390,15 +413,19 @@ pub fn propagate_signal_at(
 
     //input signal > current signal -> turning on
     // previous signal > current signal -> can be either turning on or off
+    // println!("input {input_signal} sig {}", *signal);
     if
         input_signal >= *signal ||
         (previous_signal == *signal + 1 && *signal > 0 && input_signal == 0)
     {
+
+        // println!("bare minimum");
         if let Some(_) = from_port {
             if input_signal == *signal && input_signal > 0 {
                 return;
             }
         }
+        // println!("first");
         let output_signal_type = match *signal_type {
             Some(curr_signal_type) => {
                 // redstone sources can only have their signal set externally
@@ -423,14 +450,22 @@ pub fn propagate_signal_at(
             None => {
                 match prev_signal_type {
                     Some(SignalType::Strong(true)) => {
-                        *signal_type = Some(SignalType::Strong(false));
+                        // println!("strong true");
+                        if input_signal > 0{
+                            *signal_type = Some(SignalType::Strong(false));
+                        }
+                        
                         SignalType::Strong(false)
                     }
                     Some(SignalType::Weak(true)) => {
-                        *signal_type = Some(SignalType::Weak(false));
+                        if input_signal > 0{
+                            *signal_type = Some(SignalType::Weak(false));
+                        }
+                        
                         SignalType::Weak(false)
                     }
                     _ => {
+                        // println!("also returned");
                         return;
                     }
                 }
@@ -797,18 +832,20 @@ fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut Even
             return;
         };
         let opposing_port = last_orientation.get_opposing();
-        let signal = redstone_dust.signal;
-        let transmitted_signal = if signal > 0{ signal - 1} else {0};
-        let prev_signal_type = redstone_dust.signal_type;
         let (next_x, next_y) = opposing_port.get_next_coord(x, y);
+        
         toggle_port(redstone_dust, opposing_port, true);
+        let prev_redstone = get_max_prev(chunks, x, y);
+        let (from_port, previous_signal, prev_signal_type) = prev_redstone;
+        let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
+        // println!("inside update, {:?}", prev_redstone);
         propagate_signal_at(
             chunks,
-            next_x,
-            next_y,
-            Some(opposing_port),
+            x,
+            y,
+            from_port,
             transmitted_signal,
-            signal,
+            previous_signal,
             prev_signal_type,
             listeners,
             false
