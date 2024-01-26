@@ -156,6 +156,7 @@ pub fn place(
     image_assets: &ImageAssets,
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) -> bool {
+    println!("");
     let curr = chunks.get_block(x, y);
     if let Some(_) = curr {
         return false;
@@ -201,7 +202,8 @@ pub fn place(
         previous_signal,
         previous_signal,
         prev_signal_type,
-        listeners
+        listeners,
+        false
     );
     update_entity(commands, &mut chunks, x, y, image_assets, query);
     return true;
@@ -216,6 +218,7 @@ pub fn destroy(
     image_assets: &ImageAssets,
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) -> bool {
+    println!("");
     let curr_blk = chunks.get_maybe_block(x, y);
     if let Some(mutref) = curr_blk {
         if
@@ -228,7 +231,7 @@ pub fn destroy(
             let curr_output_ports = *output_ports;
             *mutref = None;
             // chunks.print_chunks();
-            let transmitted_signal = if curr_signal < 1 { 0 } else { curr_signal - 1 };
+            // let transmitted_signal = if curr_signal < 1 { 0 } else { curr_signal - 1 };
 
             for (idx, port) in curr_output_ports.iter().enumerate() {
                 if *port {
@@ -241,9 +244,10 @@ pub fn destroy(
                         next_y,
                         Some(input_port_orientation),
                         0,
-                        transmitted_signal,
+                        curr_signal,
                         curr_signal_type,
                         listeners
+                        , false
                     );
                 }
             }
@@ -317,7 +321,8 @@ pub fn propagate_signal_at(
     input_signal: u8,
     previous_signal: u8,
     prev_signal_type: Option<SignalType>,
-    listeners: &mut EventListeners
+    listeners: &mut EventListeners,
+    from_list: bool
 ) {
     if input_signal <= 0 && previous_signal <= 1 {
         return;
@@ -344,7 +349,6 @@ pub fn propagate_signal_at(
             return;
         }
     };
-
     // if there is an input signal, filter out all signals that will not continue propagation
     // Cases are: Weak signal from opaque block going to redstone dust
     // triggering a mechanism. In cases of redstone torch it will propagate on the next tick
@@ -384,12 +388,20 @@ pub fn propagate_signal_at(
 
     //input signal > current signal -> turning on
     // previous signal > current signal -> can be either turning on or off
-    if input_signal >= *signal || (previous_signal >= *signal && *signal > 0) {
+    if input_signal >= *signal || (previous_signal == *signal + 1 && *signal > 0 && input_signal == 0) {
+        
+        if let Some(_) = from_port {
+            if input_signal == *signal && input_signal > 0{
+                return;
+            }
+        }
+        // println!("i2nput {input_signal} prev {previous_signal} sig {signal} list {from_list} pos {x} {y}");
         let output_signal_type = match *signal_type {
             Some(curr_signal_type) => {
-                // redstone sources can only have their signal set externally and no
+                // redstone sources can only have their signal set externally
                 if let SignalType::Strong(true) = curr_signal_type {
                     if let Some(_) = from_port {
+                        // println!("returned");
                         return;
                     }
                 }
@@ -425,14 +437,10 @@ pub fn propagate_signal_at(
         // the equality is only valid for cases where the entity is lit up by the system
         // The cases are when a mechanism can propagate siganl and is lit up by external circumstances
         // None in from_port means that the entity is lighting itself up
-        if let Some(_) = from_port {
-            if input_signal == *signal {
-                return;
-            }
-        }
+
         let current_signal = *signal;
         *signal = input_signal;
-        let transmitted_signal = if *signal > 0 { *signal - 1 } else { 0 };
+        let transmitted_signal = if input_signal > 0 { input_signal - 1 } else { 0 };
 
         listeners.entity_map_update.insert((x, y));
         for (idx, port) in output_ports.iter().enumerate() {
@@ -440,6 +448,7 @@ pub fn propagate_signal_at(
                 let port_orientation = Orientation::port_idx_to_orientation(idx);
                 let input_port_orientation = port_orientation.get_opposing();
                 let (next_x, next_y) = port_orientation.get_next_coord(x, y);
+                // println!("prop {transmitted_signal}");
                 propagate_signal_at(
                     chunks,
                     next_x,
@@ -448,7 +457,8 @@ pub fn propagate_signal_at(
                     transmitted_signal,
                     current_signal,
                     Some(output_signal_type),
-                    listeners
+                    listeners,
+                    from_list
                 );
             }
         }
@@ -466,7 +476,8 @@ pub fn propagate_signal_at(
             previous_signal,
             previous_signal,
             prev_signal_type,
-            listeners
+            listeners,
+            from_list
         );
     }
 }
@@ -517,10 +528,10 @@ pub fn execute_mechanism(
             };
             if on && signal > 0 {
                 // println!("turning off");
-                propagate_signal_at(chunks, x, y, None, 0, 16, None, listeners)
+                propagate_signal_at(chunks, x, y, None, 0, 17, None, listeners, true)
             } else if !on && signal <= 0 {
                 // println!("turning on");
-                propagate_signal_at(chunks, x, y, None, 16, 16, None, listeners)
+                propagate_signal_at(chunks, x, y, None, 16, 16, None, listeners, true)
             }
         }
         MechanismKind::Piston { ref mut extended, sticky } => {
@@ -615,12 +626,12 @@ pub fn execute_mechanism(
             } else if *countdown == 0 {
                 *countdown -= 1;
                 if signal <= 0 {
-                    propagate_signal_at(chunks, x, y, None, 16, 16, None, listeners);
+                    propagate_signal_at(chunks, x, y, None, 16, 16, None, listeners, true);
                     if !on {
                         listeners.turn_mechanism_off(x, y)
                     }
                 } else {
-                    propagate_signal_at(chunks, x, y, None, 0, 16, None, listeners);
+                    propagate_signal_at(chunks, x, y, None, 0, 16, None, listeners, true);
                     if on {
                         listeners.turn_mechanism_on(x, y)
                     }
@@ -766,7 +777,8 @@ fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut Even
                 0,
                 signal,
                 prev_signal_type,
-                listeners
+                listeners,
+                false
             );
         }
     }
@@ -791,7 +803,8 @@ fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut Even
             signal,
             signal,
             prev_signal_type,
-            listeners
+            listeners,
+            false
         );
     }
 }

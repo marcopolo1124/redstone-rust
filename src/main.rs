@@ -456,7 +456,7 @@ fn mechanism_listener(
     let mechanism_listener = listeners.mechanism_listener.clone();
     listeners.mechanism_listener.clear();
     if mechanism_listener.len() > 0{
-        //println!("{:?}", mechanism_listener);
+        println!("{:?}", mechanism_listener);
     }
     
     for ((x, y), on) in mechanism_listener {
