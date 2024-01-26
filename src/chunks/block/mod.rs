@@ -1,4 +1,8 @@
 pub use super::*;
+mod redstone;
+pub use redstone::*;
+mod mechanism;
+pub use mechanism::*;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Block {

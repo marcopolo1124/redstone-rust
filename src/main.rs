@@ -1,4 +1,4 @@
-mod chunk;
+mod chunks;
 use std::f32::consts::PI;
 
 use bevy_asset_loader::loading_state::{
@@ -6,13 +6,10 @@ use bevy_asset_loader::loading_state::{
     LoadingState,
     LoadingStateAppExt,
 };
-pub use chunk::*;
+pub use chunks::*;
 
 mod texture;
 pub use texture::*;
-
-mod block;
-pub use block::*;
 
 use bevy::{ prelude::*, utils::{ HashMap, HashSet }, window::PrimaryWindow };
 
