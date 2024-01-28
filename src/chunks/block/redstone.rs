@@ -335,6 +335,7 @@ pub fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut 
                 false
             );
         }
+
     }
 
     if count == 1 {
@@ -374,4 +375,19 @@ pub fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut 
         }
         
     }
+    let prev_redstone = get_max_prev(chunks, x, y);
+    let (from_port, previous_signal, prev_signal_type) = prev_redstone;
+    let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
+    // println!("prev redstone 2{:?}", prev_redstone);
+    propagate_signal_at(
+        chunks,
+        x,
+        y,
+        from_port,
+        transmitted_signal,
+        previous_signal,
+        prev_signal_type,
+        listeners,
+        false
+    );
 }
