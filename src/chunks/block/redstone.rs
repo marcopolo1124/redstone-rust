@@ -19,7 +19,9 @@ pub fn propagate_signal_at(
 
     let curr_blk = chunks.get_block(x, y);
 
-    let (signal, signal_type, kind, input_ports, output_ports) = match *curr_blk {
+    let (signal, signal_type, kind, input_ports, output_ports, signal_type_port_mapping) = match
+        *curr_blk
+    {
         Some(
             Block {
                 redstone: Some(
@@ -29,11 +31,12 @@ pub fn propagate_signal_at(
                         kind,
                         input_ports,
                         output_ports,
+                        signal_type_port_mapping,
                     },
                 ),
                 ..
             },
-        ) => (signal, signal_type, kind, input_ports, output_ports),
+        ) => (signal, signal_type, kind, input_ports, output_ports, signal_type_port_mapping),
         _ => {
             // println!("no block");
             return;
@@ -165,6 +168,12 @@ pub fn propagate_signal_at(
                 let port_orientation = Orientation::port_idx_to_orientation(idx);
                 let input_port_orientation = port_orientation.get_opposing();
                 let (next_x, next_y) = port_orientation.get_next_coord(x, y);
+                let port_signal_type = signal_type_port_mapping[idx];
+                let mut port_output_signal_type = output_signal_type;
+                if let Some(signal_type) = port_signal_type {
+                    port_output_signal_type = signal_type;
+                }
+                println!("{:?}", port_output_signal_type);
                 //  println!("prop {transmitted_signal}");
                 propagate_signal_at(
                     chunks,
@@ -173,7 +182,7 @@ pub fn propagate_signal_at(
                     Some(input_port_orientation),
                     transmitted_signal,
                     current_signal,
-                    Some(output_signal_type),
+                    Some(port_output_signal_type),
                     listeners,
                     from_list
                 );
@@ -237,7 +246,7 @@ pub fn get_max_prev(
                 let Some(
                     Some(
                         Block {
-                            redstone: Some(Redstone { signal, output_ports, signal_type, .. }),
+                            redstone: Some(Redstone { signal, output_ports, signal_type, signal_type_port_mapping, .. }),
                             ..
                         },
                     ),
@@ -250,7 +259,13 @@ pub fn get_max_prev(
                 {
                     max_signal = *signal;
                     max_signal_loc = Some(port_orientation);
-                    max_signal_type = *signal_type;
+                    let output_port_signal_type = signal_type_port_mapping[port_orientation.get_opposing().to_port_idx()];
+                    let mut signal_type = *signal_type;
+                    if let Some(sig_type) = output_port_signal_type{
+                        signal_type = Some(sig_type);
+                    }
+
+                    max_signal_type = signal_type;
                 }
             }
         }

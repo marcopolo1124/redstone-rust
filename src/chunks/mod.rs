@@ -172,6 +172,7 @@ pub fn place(
         Some(Redstone {
             input_ports: orientation.rotate_ports(redstone.input_ports),
             output_ports: orientation.rotate_ports(redstone.output_ports),
+            signal_type_port_mapping: orientation.rotate_ports(redstone.signal_type_port_mapping),
             ..redstone
         })
     } else {

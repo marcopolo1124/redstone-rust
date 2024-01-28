@@ -19,6 +19,7 @@ pub struct Redstone {
     pub signal: u8,
     pub signal_type: Option<SignalType>,
     pub kind: Option<RedstoneKind>,
+    pub signal_type_port_mapping: [Option<SignalType>; 4],
     pub input_ports: [bool; 4],
     pub output_ports: [bool; 4],
 }
@@ -99,7 +100,7 @@ impl Orientation {
         }
     }
 
-    pub fn rotate_ports(&self, ports: [bool; 4]) -> [bool; 4] {
+    pub fn rotate_ports<T: Clone>(&self, ports: [T; 4]) -> [T; 4] {
         let rotate_amount = match self {
             Orientation::Up => 0,
             Orientation::Right => 1,

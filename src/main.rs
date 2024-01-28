@@ -124,6 +124,7 @@ const DIRT: Block = Block {
         signal: 0,
         signal_type: None,
         kind: None,
+        signal_type_port_mapping: [None, None, None, None],
         input_ports: [true, true, true, true],
         output_ports: [true, true, true, true],
     }),
@@ -139,6 +140,12 @@ const REDSTONE_TORCH: Block = Block {
         signal: 16,
         signal_type: Some(SignalType::Strong(true)),
         kind: Some(RedstoneKind::Mechanism),
+        signal_type_port_mapping: [
+            Some(SignalType::Strong(true)),
+            Some(SignalType::Strong(false)),
+            None,
+            Some(SignalType::Strong(false)),
+        ],
         input_ports: [false, false, true, false],
         output_ports: [true, true, false, true],
     }),
@@ -152,6 +159,7 @@ const REPEATER: Block = Block {
     symmetric: false,
     redstone: Some(Redstone {
         signal: 0,
+        signal_type_port_mapping: [Some(SignalType::Strong(true)), None, None, None],
         signal_type: Some(SignalType::Strong(true)),
         kind: Some(RedstoneKind::Mechanism),
         input_ports: [false, false, true, false],
@@ -168,6 +176,12 @@ const REDSTONE_DUST: Block = Block {
     redstone: Some(Redstone {
         signal: 0,
         signal_type: Some(SignalType::Weak(true)),
+        signal_type_port_mapping: [
+            Some(SignalType::Weak(true)),
+            Some(SignalType::Weak(true)),
+            Some(SignalType::Weak(true)),
+            Some(SignalType::Weak(true)),
+        ],
         kind: Some(RedstoneKind::Dust),
         input_ports: [true, true, true, true],
         output_ports: [true, true, true, true],
@@ -183,6 +197,7 @@ const PISTON: Block = Block {
     redstone: Some(Redstone {
         signal: 0,
         signal_type: None,
+        signal_type_port_mapping: [None, None, None, None],
         kind: Some(RedstoneKind::Mechanism),
         input_ports: [false, true, true, true],
         output_ports: [false, false, false, false],
@@ -207,6 +222,7 @@ const STICKY_PISTON: Block = Block {
     redstone: Some(Redstone {
         signal: 0,
         signal_type: None,
+        signal_type_port_mapping: [None, None, None, None],
         kind: Some(RedstoneKind::Mechanism),
         input_ports: [false, true, true, true],
         output_ports: [false, false, false, false],
@@ -264,7 +280,14 @@ fn init(
                     if
                         let Block {
                             symmetric: false,
-                            redstone: Some(Redstone { input_ports, output_ports, .. }),
+                            redstone: Some(
+                                Redstone {
+                                    input_ports,
+                                    output_ports,
+                                    signal_type_port_mapping,
+                                    ..
+                                },
+                            ),
                             orientation,
                             ..
                         } = &mut blk_clone
@@ -274,6 +297,9 @@ fn init(
                         );
                         *input_ports = orientation_reversion.rotate_ports(*input_ports);
                         *output_ports = orientation_reversion.rotate_ports(*output_ports);
+                        *signal_type_port_mapping = orientation_reversion.rotate_ports(
+                            *signal_type_port_mapping
+                        );
                     }
 
                     place(
