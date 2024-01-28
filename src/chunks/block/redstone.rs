@@ -11,12 +11,9 @@ pub fn propagate_signal_at(
     listeners: &mut EventListeners,
     from_list: bool
 ) {
-    
     if input_signal <= 0 && previous_signal <= 1 {
         return;
     }
-
-    
 
     let curr_blk = chunks.get_block(x, y);
 
@@ -253,7 +250,7 @@ pub fn get_max_prev(
     (max_signal_loc, max_signal, max_signal_type)
 }
 
-pub fn is_redstone(chunks: &Chunks, x: i128, y: i128) -> bool {
+pub fn is_redstone(chunks: &Chunks, x: i128, y: i128, input_port: Orientation) -> bool {
     let maybe_blk = chunks.get_block_ref(x, y);
     let blk = if let Some(blk) = maybe_blk {
         blk
@@ -267,8 +264,11 @@ pub fn is_redstone(chunks: &Chunks, x: i128, y: i128) -> bool {
         return false;
     };
     if
-        redstone.signal_type == Some(SignalType::Strong(true)) ||
-        redstone.signal_type == Some(SignalType::Weak(true))
+        (redstone.input_ports[input_port.to_port_idx()] ||
+            redstone.kind == Some(RedstoneKind::Dust) ||
+            redstone.output_ports[input_port.to_port_idx()]) &&
+        (redstone.signal_type == Some(SignalType::Strong(true)) ||
+            redstone.signal_type == Some(SignalType::Weak(true)))
     {
         true
     } else {
@@ -302,7 +302,7 @@ pub fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut 
     let mut count = 0;
     for orientation in Orientation::iter() {
         let (next_x, next_y) = orientation.get_next_coord(x, y);
-        let is_dust = is_redstone(chunks, next_x, next_y);
+        let is_dust_and_open = is_redstone(chunks, next_x, next_y, orientation.get_opposing());
         let redstone = get_redstone_dust(chunks, x, y);
         let redstone_dust = if let Some(redstone_dust) = redstone {
             redstone_dust
@@ -312,7 +312,7 @@ pub fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut 
 
         toggle_port(redstone_dust, orientation, false);
 
-        if is_dust {
+        if is_dust_and_open {
             toggle_port(redstone_dust, orientation, true);
             last_orientation = orientation;
             count += 1;

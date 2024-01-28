@@ -244,11 +244,22 @@ fn init(
             for (v, blk) in row.iter().enumerate() {
                 let x = chunk_x * CHUNK_SIZE.0 + (u as i128);
                 let y = chunk_y * CHUNK_SIZE.1 + (v as i128);
-                if let Some(blk) = blk {
+
+                if let Some(blk_data) = blk {
+                    let mut blk_clone = blk_data.clone();
+                    if
+                        let Block {
+                            redstone: Some(Redstone { ref mut signal, .. }),
+                            mechanism: Some(MechanismKind::RedstoneTorch),
+                            ..
+                        } = blk_clone
+                    {
+                        *signal = 16;
+                    }
                     place(
                         &mut chunks,
-                        blk.clone(),
-                        blk.orientation,
+                        blk_clone,
+                        blk_clone.orientation,
                         x,
                         y,
                         &mut listeners,
@@ -521,9 +532,9 @@ fn mechanism_listener(
 ) {
     let mechanism_listener = listeners.mechanism_listener.clone();
     listeners.mechanism_listener.clear();
-    if mechanism_listener.len() > 0 {
-        // println!("{:?}", mechanism_listener);
-    }
+    // if mechanism_listener.len() > 0 {
+    //     println!("{:?}", mechanism_listener);
+    // }
 
     for ((x, y), on) in mechanism_listener {
         execute_mechanism(

@@ -41,6 +41,7 @@ pub fn execute_mechanism(
 
     match mechanism_kind {
         MechanismKind::RedstoneTorch => {
+            // println!("torch, {:?} {on}", redstone);
             let signal = if let Some(Redstone { signal, .. }) = redstone {
                 signal
             } else {
