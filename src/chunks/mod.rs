@@ -32,7 +32,7 @@ impl Chunk {
                     debug[idx] = 1;
                 }
             }
-            // println!("{:?}", debug);
+            //  println!("{:?}", debug);
         }
     }
 }
@@ -142,7 +142,7 @@ impl Chunks {
 
     pub fn print_chunks(&self) {
         for (_, v) in self.0.iter() {
-            // println!("chunk at {:?}", k);
+            //  println!("chunk at {:?}", k);
             v.print_chunk();
         }
     }
@@ -159,7 +159,6 @@ pub fn place(
     image_assets: &ImageAssets,
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) -> bool {
-    // println!("");
     let curr = chunks.get_block(x, y);
     if let Some(_) = curr {
         return false;
@@ -208,7 +207,7 @@ pub fn place(
         let prev_redstone = get_max_prev(chunks, x, y);
         let (from_port, previous_signal, prev_signal_type) = prev_redstone;
         let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
-        // println!("prev redstone 2{:?}", prev_redstone);
+        //  println!("prev redstone 2{:?}", prev_redstone);
         propagate_signal_at(
             chunks,
             x,
@@ -236,8 +235,8 @@ pub fn destroy(
     image_assets: &ImageAssets,
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) -> bool {
-    // println!("");
-    // println!("destroy {x} {y}");
+    //  println!("");
+    //  println!("destroy {x} {y}");
     let curr_blk = chunks.get_maybe_block(x, y);
     if let Some(mutref) = curr_blk {
         if
@@ -288,7 +287,7 @@ pub fn destroy(
 
     listeners.remove_mechanism(x, y);
     
-    // println!("update");
+    //  println!("update");
     return true;
 }
 

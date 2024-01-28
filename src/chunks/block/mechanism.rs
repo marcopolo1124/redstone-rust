@@ -41,17 +41,17 @@ pub fn execute_mechanism(
 
     match mechanism_kind {
         MechanismKind::RedstoneTorch => {
-            // println!("torch, {:?} {on}", redstone);
+            //  println!("torch, {:?} {on}", redstone);
             let signal = if let Some(Redstone { signal, .. }) = redstone {
                 signal
             } else {
                 return;
             };
             if on && signal > 0 {
-                // println!("turning off");
+                //  println!("turning off");
                 propagate_signal_at(chunks, x, y, None, 0, 17, None, listeners, true)
             } else if !on && signal <= 0 {
-                // println!("turning on");
+                //  println!("turning on");
                 propagate_signal_at(chunks, x, y, None, 16, 16, None, listeners, true)
             }
         }
@@ -59,7 +59,7 @@ pub fn execute_mechanism(
             let is_sticky = *sticky;
             let piston_head = if is_sticky { STICKY_PISTON_HEAD } else { PISTON_HEAD };
             if !*extended && on {
-                // println!("moved");
+                //  println!("moved");
                 let (next_x, next_y) = orientation.get_next_coord(x, y);
                 let moved = move_blocks(
                     chunks,
@@ -175,9 +175,9 @@ fn move_blocks(
     image_assets: &ImageAssets,
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) -> bool {
-    // println!("called moved blocks");
+    //  println!("called moved blocks");
     if strength <= 0 {
-        // println!("no strength");
+        //  println!("no strength");
         return false;
     }
 
@@ -186,11 +186,11 @@ fn move_blocks(
         if blk.movable {
             *blk
         } else {
-            // println!("block not movable");
+            //  println!("block not movable");
             return false;
         }
     } else {
-        // println!("none");
+        //  println!("none");
         return true;
     };
 
@@ -207,7 +207,7 @@ fn move_blocks(
         query
     );
     if moved {
-        // println!("place and destroy");
+        //  println!("place and destroy");
         if let Block{redstone: Some(Redstone{ref mut signal, ref mut signal_type, ..}), ..} = blk{
             if *signal_type == Some(SignalType::Strong(false)) || *signal_type == Some(SignalType::Weak(false)){
                 *signal = 0;
