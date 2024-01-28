@@ -596,23 +596,53 @@ pub fn zoom_camera(
 ) {
     use bevy::input::mouse::MouseScrollUnit;
     if let Ok(mut transform) = query.get_single_mut() {
+        let mut scale_delta = 0.0;
         for ev in scroll_evr.read() {
+            println!("scrolled");
             match ev.unit {
                 MouseScrollUnit::Line => {
-                    let new_scale = transform.scale + 0.1 * ev.y;
-                    if new_scale > 0.0 {
-                        transform.scale = new_scale;
-                    } else {
+                    let new_scale_delta = scale_delta + (0.1 * ev.y);
+                    if new_scale_delta.abs() < 0.2{
+                        scale_delta = new_scale_delta
+                    } else{
+                        if new_scale_delta > 0.0 {
+                            scale_delta = 0.2
+                        } else{
+                            scale_delta = -0.2
+                        }
                     }
+                    // let new_scale = transform.scale + 0.1 * ev.y;
+                    // if new_scale > 0.0 {
+                    //     transform.scale = new_scale;
+                    // } else {
+                    // }
                 }
                 MouseScrollUnit::Pixel => {
-                    let new_scale = transform.scale + 0.1 * ev.y;
-                    if new_scale > 0.0 {
-                        transform.scale = new_scale;
-                    } else {
+                    let new_scale_delta = scale_delta + (0.1 * ev.y);
+                    if new_scale_delta.abs() < 0.2{
+                        scale_delta = new_scale_delta
+                    } else{
+                        if new_scale_delta > 0.0 {
+                            scale_delta = 0.2
+                        } else{
+                            scale_delta = -0.2
+                        }
                     }
+                    // let new_scale = transform.scale + 0.1 * ev.y;
+                    // if new_scale > 0.0 {
+                    //     transform.scale = new_scale;
+                    // } else {
+                    // }
                 }
             }
         }
+
+        if transform.scale + scale_delta > 0.0 {
+            transform.scale += scale_delta;
+        } else{
+            transform.scale = 0.0;
+        }
+        // transform.scale = std::cmp::max(0.0, transform.scale + scale_delta);
+        
     }
 }
