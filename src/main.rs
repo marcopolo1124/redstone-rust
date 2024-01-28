@@ -110,6 +110,7 @@ fn main() {
         .add_systems(Update, move_camera.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, update_orientation.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, autosave.run_if(in_state(MyStates::InGame)))
+        .add_systems(Update, zoom_camera.run_if(in_state(MyStates::InGame)))
         .run()
 }
 
@@ -244,7 +245,7 @@ fn init(
             for (v, blk) in row.iter().enumerate() {
                 let x = chunk_x * CHUNK_SIZE.0 + (u as i128);
                 let y = chunk_y * CHUNK_SIZE.1 + (v as i128);
-
+                listeners.update_entity(x, y);
                 if let Some(blk_data) = blk {
                     let mut blk_clone = blk_data.clone();
                     if
@@ -437,6 +438,7 @@ fn update_entity(
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) {
     // println!("{:?}", chunks);
+    println!("updating entity {x} {y}");
     let curr_blk = chunks.get_block(x, y).clone();
     let curr_entity = chunks.get_entity(x, y);
 
@@ -584,5 +586,33 @@ fn autosave(
         save_data.0 = current_state;
 
         save_data.persist().ok();
+    }
+}
+
+use bevy::input::mouse::MouseWheel;
+pub fn zoom_camera(
+    mut query: Query<&mut OrthographicProjection, With<Camera>>,
+    mut scroll_evr: EventReader<MouseWheel>
+) {
+    use bevy::input::mouse::MouseScrollUnit;
+    if let Ok(mut transform) = query.get_single_mut() {
+        for ev in scroll_evr.read() {
+            match ev.unit {
+                MouseScrollUnit::Line => {
+                    let new_scale = transform.scale + 0.1 * ev.y;
+                    if new_scale > 0.0 {
+                        transform.scale = new_scale;
+                    } else {
+                    }
+                }
+                MouseScrollUnit::Pixel => {
+                    let new_scale = transform.scale + 0.1 * ev.y;
+                    if new_scale > 0.0 {
+                        transform.scale = new_scale;
+                    } else {
+                    }
+                }
+            }
+        }
     }
 }

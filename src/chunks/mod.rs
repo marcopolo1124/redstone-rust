@@ -6,7 +6,7 @@ pub use block::*;
 
 use bevy::utils::HashMap;
 
-pub const CHUNK_SIZE: (i128, i128) = (3, 3);
+pub const CHUNK_SIZE: (i128, i128) = (16, 16);
 
 pub type Map = [[Option<Block>; CHUNK_SIZE.0 as usize]; CHUNK_SIZE.1 as usize];
 pub type EntityMap = [[Option<Entity>; CHUNK_SIZE.1 as usize]; CHUNK_SIZE.0 as usize];
@@ -188,14 +188,21 @@ pub fn place(
 
     
 
-    if let Some(_) = redstone{
-        update_dust_ports(chunks, x, y, listeners);
+    if let Some(rs) = redstone{
+
+        match rs.signal_type{
+            Some(SignalType::Strong(true) | SignalType::Weak(true)) => {
+                update_dust_ports(chunks, x, y, listeners);
         
-        for orientation in Orientation::iter() {
-            let (next_x, next_y) = orientation.get_next_coord(x, y);
-            update_dust_ports(chunks, next_x, next_y, listeners);
-            update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
+                for orientation in Orientation::iter() {
+                    let (next_x, next_y) = orientation.get_next_coord(x, y);
+                    update_dust_ports(chunks, next_x, next_y, listeners);
+                    update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
+                }
+            },
+            _ => {}
         }
+
     
         // chunks.print_chunks();
     
@@ -265,11 +272,15 @@ pub fn destroy(
                     );
                 }
             }
-            for orientation in Orientation::iter() {
-                let (next_x, next_y) = orientation.get_next_coord(x, y);
-                update_dust_ports(chunks, next_x, next_y, listeners);
-                update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
+
+            if curr_signal_type == Some(SignalType::Strong(true)) || curr_signal_type == Some(SignalType::Weak(true)) {
+                for orientation in Orientation::iter() {
+                    let (next_x, next_y) = orientation.get_next_coord(x, y);
+                    update_dust_ports(chunks, next_x, next_y, listeners);
+                    update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
+                }
             }
+
         } else {
             *mutref = None;
             update_entity(commands, &mut chunks, x, y, image_assets, query);
