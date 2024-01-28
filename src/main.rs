@@ -1,5 +1,6 @@
 mod chunks;
-use std::f32::consts::PI;
+use std::{ f32::consts::PI, path::Path };
+use std::time::Duration;
 
 use bevy_asset_loader::loading_state::{
     config::ConfigureLoadingState,
@@ -7,6 +8,10 @@ use bevy_asset_loader::loading_state::{
     LoadingStateAppExt,
 };
 pub use chunks::*;
+
+pub use serde::{ Serialize, Deserialize };
+
+pub use bevy_persistent::prelude::*;
 
 mod texture;
 pub use texture::*;
@@ -40,7 +45,7 @@ impl EventListeners {
     pub fn turn_mechanism_off(&mut self, x: i128, y: i128) {
         self.mechanism_listener.insert((x, y), false);
     }
-    pub fn remove_mechanism(&mut self, x: i128, y: i128){
+    pub fn remove_mechanism(&mut self, x: i128, y: i128) {
         self.mechanism_listener.remove(&(x, y));
     }
 }
@@ -54,11 +59,25 @@ impl SelectedBlock {
     }
 }
 
+#[derive(Resource, Serialize, Deserialize)]
+struct SaveData(
+    Vec<((i128, i128), [[Option<Block>; CHUNK_SIZE.0 as usize]; CHUNK_SIZE.1 as usize])>,
+);
+
+#[derive(Resource)]
+struct AutosaveTimer {
+    timer: Timer,
+}
+
 const TICK: f64 = 0.2;
 
 fn main() {
     let chunks = Chunks::new();
     let event_listeners = EventListeners::new();
+    let state_dir = dirs
+        ::config_dir()
+        .map(|dir| dir.join("redstone_rust"))
+        .unwrap_or(Path::new("local").join("save"));
 
     App::new()
         .add_state::<MyStates>()
@@ -68,6 +87,16 @@ fn main() {
         .insert_resource(event_listeners)
         .insert_resource(SelectedBlock(Some(DIRT)))
         .insert_resource(Orientation::Up)
+        .insert_resource(
+            Persistent::<SaveData>
+                ::builder()
+                .name("save data")
+                .format(StorageFormat::Json)
+                .path(state_dir.join("save_data.json"))
+                .default(SaveData(Vec::new()))
+                .build()
+                .expect("failed to initialize game state")
+        )
         .add_loading_state(
             LoadingState::new(MyStates::AssetLoading)
                 .continue_to_state(MyStates::InGame)
@@ -80,6 +109,7 @@ fn main() {
         .add_systems(Update, update_entity_listener.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, move_camera.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, update_orientation.run_if(in_state(MyStates::InGame)))
+        .add_systems(Update, autosave.run_if(in_state(MyStates::InGame)))
         .run()
 }
 
@@ -191,10 +221,45 @@ const STICKY_PISTON_HEAD: Block = Block {
     mechanism: None,
 };
 
-fn init(mut commands: Commands) {
+const AUTOSAVE_INTERVAL_SECONDS: f32 = 3.0;
+
+fn init(
+    mut commands: Commands,
+    save_data: Res<Persistent<SaveData>>,
+    mut chunks: ResMut<Chunks>,
+    mut listeners: ResMut<EventListeners>,
+    image_assets: Res<ImageAssets>,
+    mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>
+) {
     commands.spawn(Camera2dBundle {
         ..default()
     });
+
+    commands.insert_resource(AutosaveTimer {
+        timer: Timer::new(Duration::from_secs_f32(AUTOSAVE_INTERVAL_SECONDS), TimerMode::Repeating),
+    });
+
+    for ((chunk_x, chunk_y), map) in save_data.0.iter() {
+        for (u, row) in map.iter().enumerate() {
+            for (v, blk) in row.iter().enumerate() {
+                let x = chunk_x * CHUNK_SIZE.0 + (u as i128);
+                let y = chunk_y * CHUNK_SIZE.1 + (v as i128);
+                if let Some(blk) = blk {
+                    place(
+                        &mut chunks,
+                        blk.clone(),
+                        blk.orientation,
+                        x,
+                        y,
+                        &mut listeners,
+                        &mut commands,
+                        &image_assets,
+                        &mut query
+                    );
+                }
+            }
+        }
+    }
 }
 
 pub fn update_selected_block(
@@ -233,7 +298,6 @@ pub fn update_orientation(
         *orientation = Orientation::Down;
     }
 }
-
 
 pub fn mouse_input(
     mut commands: Commands,
@@ -303,7 +367,7 @@ fn update_entity_listener(
     listeners.entity_map_update.clear();
 }
 
-fn get_connection(ports: &[bool; 4]) -> usize{
+fn get_connection(ports: &[bool; 4]) -> usize {
     match *ports {
         [true, true, true, true] => 10,
         [false, true, true, true] => 9,
@@ -316,16 +380,19 @@ fn get_connection(ports: &[bool; 4]) -> usize{
         [true, false, false, true] => 2,
         [true, false, true, false] => 1,
         [true, true, false, false] => 0,
-        _ => 10
+        _ => 10,
     }
 }
 
 fn get_state(blk: Block) -> usize {
     match blk {
-        Block { redstone: Some(Redstone { signal, kind: Some(RedstoneKind::Dust), input_ports,.. }), .. } => {
+        Block {
+            redstone: Some(Redstone { signal, kind: Some(RedstoneKind::Dust), input_ports, .. }),
+            ..
+        } => {
             let conn_ind = get_connection(&input_ports);
             // println!("{conn_ind}");
-            conn_ind * 16 + signal as usize
+            conn_ind * 16 + (signal as usize)
         }
         Block {
             redstone: Some(Redstone { signal, kind: Some(RedstoneKind::Mechanism), .. }),
@@ -361,7 +428,6 @@ fn update_entity(
     // println!("{:?}", chunks);
     let curr_blk = chunks.get_block(x, y).clone();
     let curr_entity = chunks.get_entity(x, y);
-    
 
     if let Some(blk) = curr_blk {
         let Block { texture_name, orientation, .. } = blk;
@@ -455,10 +521,10 @@ fn mechanism_listener(
 ) {
     let mechanism_listener = listeners.mechanism_listener.clone();
     listeners.mechanism_listener.clear();
-    if mechanism_listener.len() > 0{
+    if mechanism_listener.len() > 0 {
         // println!("{:?}", mechanism_listener);
     }
-    
+
     for ((x, y), on) in mechanism_listener {
         execute_mechanism(
             &mut chunks,
@@ -489,4 +555,23 @@ fn interact(
         _ => {}
     }
     update_entity(commands, chunks, x, y, image_assets, query)
+}
+
+fn autosave(
+    time: Res<Time>,
+    mut autosave: ResMut<AutosaveTimer>,
+    mut save_data: ResMut<Persistent<SaveData>>,
+    chunks: Res<Chunks>
+) {
+    autosave.timer.tick(time.delta());
+    if autosave.timer.finished() {
+        let mut current_state = Vec::new();
+        for ((x, y), chunk) in chunks.0.iter() {
+            let tuple = ((*x, *y), chunk.map.clone());
+            current_state.push(tuple);
+        }
+        save_data.0 = current_state;
+
+        save_data.persist().ok();
+    }
 }

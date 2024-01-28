@@ -4,7 +4,7 @@ pub use redstone::*;
 mod mechanism;
 pub use mechanism::*;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub struct Block {
     pub movable: bool,
     pub orientation: Orientation,
@@ -14,7 +14,7 @@ pub struct Block {
     pub mechanism: Option<MechanismKind>,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub struct Redstone {
     pub signal: u8,
     pub signal_type: Option<SignalType>,
@@ -23,7 +23,7 @@ pub struct Redstone {
     pub output_ports: [bool; 4],
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum MechanismKind {
     RedstoneTorch,
     Repeater {
@@ -36,20 +36,20 @@ pub enum MechanismKind {
     },
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum RedstoneKind {
     Mechanism,
     Dust,
     Block,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum SignalType {
     Strong(bool),
     Weak(bool),
 }
 
-#[derive(Debug, PartialEq, Copy, Clone, Resource)]
+#[derive(Debug, PartialEq, Copy, Clone, Resource, Serialize, Deserialize)]
 pub enum Orientation {
     Up,
     Right,

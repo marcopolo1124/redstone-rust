@@ -12,7 +12,7 @@ pub type Map = [[Option<Block>; CHUNK_SIZE.0 as usize]; CHUNK_SIZE.1 as usize];
 pub type EntityMap = [[Option<Entity>; CHUNK_SIZE.1 as usize]; CHUNK_SIZE.0 as usize];
 #[derive(Debug, Clone, Copy)]
 pub struct Chunk {
-    map: Map,
+    pub map: Map,
     entity_map: EntityMap,
 }
 
@@ -38,7 +38,7 @@ impl Chunk {
 }
 
 #[derive(Debug, Resource)]
-pub struct Chunks(HashMap<(i128, i128), Chunk>);
+pub struct Chunks(pub HashMap<(i128, i128), Chunk>);
 
 impl Chunks {
     pub fn new() -> Chunks {

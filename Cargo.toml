@@ -12,5 +12,9 @@ opt-level = 1
 opt-level = 3
 
 [dependencies]
-bevy = "0.12.1"
+bevy = { version = "0.12.1"}
+bevy-persistent = { version = "0.4.3", features = ["json"] }
 bevy_asset_loader = {version = "0.19.1", features=["2d"]}
+dirs = "5.0.1"
+serde = "1.0.196"
+serde_with = "3.5.1"

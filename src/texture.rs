@@ -1,4 +1,5 @@
-use bevy::prelude::*;
+// use bevy::prelude::*;
+pub use super::*;
 // use bevy_asset_loader::asset_collection::AssetCollection;
 use bevy_asset_loader::prelude::*;
 
@@ -65,7 +66,7 @@ pub fn get_atlas(texture_name: TextureName, image_assets: &ImageAssets) -> Handl
     // image_assets.dirt.clone()
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, Hash, Eq)]
+#[derive(Debug, PartialEq, Clone, Copy, Hash, Eq, Serialize, Deserialize)]
 pub enum TextureName {
     Dirt,
     RedstoneTorch,
