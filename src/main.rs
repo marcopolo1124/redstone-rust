@@ -83,6 +83,7 @@ fn main() {
         .add_state::<MyStates>()
         .insert_resource(Time::<Fixed>::from_seconds(TICK))
         .add_plugins(DefaultPlugins)
+        .insert_resource(Msaa::Off)
         .insert_resource(chunks)
         .insert_resource(event_listeners)
         .insert_resource(SelectedBlock(Some(DIRT)))
