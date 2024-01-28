@@ -43,7 +43,7 @@ pub fn propagate_signal_at(
     // println!("should {x} {y} {:?} {:?}", prev_signal_type, from_port);
     if let Some(from_port) = from_port {
         if !input_ports[from_port.to_port_idx()] {
-            // println!("port idx problem");
+            println!("port idx problem at {x} {y}");
             return;
         }
         // println!("kind {:?}", kind);
@@ -59,6 +59,8 @@ pub fn propagate_signal_at(
                     // println!("returned none");
                     return;
                 }
+
+                println!("strong true or false");
             }
             Some(RedstoneKind::Mechanism) => {
                 if input_signal > 0 {
@@ -309,23 +311,25 @@ pub fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut 
         } else {
             return;
         };
-
+        
+        let initial = redstone_dust.input_ports[orientation.to_port_idx()];
         toggle_port(redstone_dust, orientation, false);
 
         if is_dust_and_open {
             toggle_port(redstone_dust, orientation, true);
             last_orientation = orientation;
             count += 1;
-        } else {
+        } else if initial {
             let signal = redstone_dust.signal;
             let prev_signal_type = redstone_dust.signal_type;
+            println!("propagation happening at {x} {y}");
             propagate_signal_at(
                 chunks,
-                next_x,
-                next_y,
-                Some(orientation),
+                x,
+                y,
+                None,
                 0,
-                signal,
+                signal + 1,
                 prev_signal_type,
                 listeners,
                 false
@@ -358,5 +362,16 @@ pub fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut 
             listeners,
             false
         );
+    } else if count == 0 {
+        for orientation in Orientation::iter(){
+            let redstone = get_redstone_dust(chunks, x, y);
+            let redstone_dust = if let Some(redstone_dust) = redstone {
+                redstone_dust
+            } else {
+                return;
+            };
+            toggle_port(redstone_dust, orientation, true);
+        }
+        
     }
 }
