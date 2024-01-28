@@ -43,7 +43,7 @@ pub fn propagate_signal_at(
     // println!("should {x} {y} {:?} {:?}", prev_signal_type, from_port);
     if let Some(from_port) = from_port {
         if !input_ports[from_port.to_port_idx()] {
-            println!("port idx problem at {x} {y}");
+            // println!("port idx problem at {x} {y}");
             return;
         }
         // println!("kind {:?}", kind);
@@ -60,7 +60,7 @@ pub fn propagate_signal_at(
                     return;
                 }
 
-                println!("strong true or false");
+                // println!("strong true or false");
             }
             Some(RedstoneKind::Mechanism) => {
                 if input_signal > 0 {
@@ -322,7 +322,7 @@ pub fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut 
         } else if initial {
             let signal = redstone_dust.signal;
             let prev_signal_type = redstone_dust.signal_type;
-            println!("propagation happening at {x} {y}");
+            // println!("propagation happening at {x} {y}");
             propagate_signal_at(
                 chunks,
                 x,

@@ -245,18 +245,36 @@ fn init(
             for (v, blk) in row.iter().enumerate() {
                 let x = chunk_x * CHUNK_SIZE.0 + (u as i128);
                 let y = chunk_y * CHUNK_SIZE.1 + (v as i128);
+
                 listeners.update_entity(x, y);
                 if let Some(blk_data) = blk {
                     let mut blk_clone = blk_data.clone();
                     if
                         let Block {
-                            redstone: Some(Redstone { ref mut signal, .. }),
+                            redstone: Some(Redstone { signal, .. }),
+
                             mechanism: Some(MechanismKind::RedstoneTorch),
                             ..
-                        } = blk_clone
+                        } = &mut blk_clone
                     {
                         *signal = 16;
                     }
+
+                    if
+                        let Block {
+                            symmetric: false,
+                            redstone: Some(Redstone { input_ports, output_ports, .. }),
+                            orientation,
+                            ..
+                        } = &mut blk_clone
+                    {
+                        let orientation_reversion = Orientation::port_idx_to_orientation(
+                            (4 - orientation.to_port_idx()).rem_euclid(4)
+                        );
+                        *input_ports = orientation_reversion.rotate_ports(*input_ports);
+                        *output_ports = orientation_reversion.rotate_ports(*output_ports);
+                    }
+
                     place(
                         &mut chunks,
                         blk_clone,
@@ -438,7 +456,7 @@ fn update_entity(
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) {
     // println!("{:?}", chunks);
-    println!("updating entity {x} {y}");
+    // println!("updating entity {x} {y}");
     let curr_blk = chunks.get_block(x, y).clone();
     let curr_entity = chunks.get_entity(x, y);
 
@@ -535,7 +553,7 @@ fn mechanism_listener(
     let mechanism_listener = listeners.mechanism_listener.clone();
     listeners.mechanism_listener.clear();
     // if mechanism_listener.len() > 0 {
-    //     println!("{:?}", mechanism_listener);
+    //     // println!("{:?}", mechanism_listener);
     // }
 
     for ((x, y), on) in mechanism_listener {
@@ -598,17 +616,17 @@ pub fn zoom_camera(
     if let Ok(mut transform) = query.get_single_mut() {
         let mut scale_delta = 0.0;
         for ev in scroll_evr.read() {
-            println!("scrolled");
+            // println!("scrolled");
             match ev.unit {
                 MouseScrollUnit::Line => {
-                    let new_scale_delta = scale_delta + (0.1 * ev.y);
-                    if new_scale_delta.abs() < 0.2{
-                        scale_delta = new_scale_delta
-                    } else{
+                    let new_scale_delta = scale_delta + 0.1 * ev.y;
+                    if new_scale_delta.abs() < 0.2 {
+                        scale_delta = new_scale_delta;
+                    } else {
                         if new_scale_delta > 0.0 {
-                            scale_delta = 0.2
-                        } else{
-                            scale_delta = -0.2
+                            scale_delta = 0.2;
+                        } else {
+                            scale_delta = -0.2;
                         }
                     }
                     // let new_scale = transform.scale + 0.1 * ev.y;
@@ -618,14 +636,14 @@ pub fn zoom_camera(
                     // }
                 }
                 MouseScrollUnit::Pixel => {
-                    let new_scale_delta = scale_delta + (0.1 * ev.y);
-                    if new_scale_delta.abs() < 0.2{
-                        scale_delta = new_scale_delta
-                    } else{
+                    let new_scale_delta = scale_delta + 0.1 * ev.y;
+                    if new_scale_delta.abs() < 0.2 {
+                        scale_delta = new_scale_delta;
+                    } else {
                         if new_scale_delta > 0.0 {
-                            scale_delta = 0.2
-                        } else{
-                            scale_delta = -0.2
+                            scale_delta = 0.2;
+                        } else {
+                            scale_delta = -0.2;
                         }
                     }
                     // let new_scale = transform.scale + 0.1 * ev.y;
@@ -639,10 +657,9 @@ pub fn zoom_camera(
 
         if transform.scale + scale_delta > 0.0 {
             transform.scale += scale_delta;
-        } else{
+        } else {
             transform.scale = 0.0;
         }
         // transform.scale = std::cmp::max(0.0, transform.scale + scale_delta);
-        
     }
 }

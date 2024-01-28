@@ -160,7 +160,6 @@ pub fn place(
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) -> bool {
     // println!("");
-    // println!("place");
     let curr = chunks.get_block(x, y);
     if let Some(_) = curr {
         return false;
