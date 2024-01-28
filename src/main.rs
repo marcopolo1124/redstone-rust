@@ -417,10 +417,10 @@ fn get_connection(ports: &[bool; 4]) -> usize {
 fn get_state(blk: Block) -> usize {
     match blk {
         Block {
-            redstone: Some(Redstone { signal, kind: Some(RedstoneKind::Dust), input_ports, .. }),
+            redstone: Some(Redstone { signal, kind: Some(RedstoneKind::Dust), output_ports, .. }),
             ..
         } => {
-            let conn_ind = get_connection(&input_ports);
+            let conn_ind = get_connection(&output_ports);
             //  println!("{conn_ind}");
             conn_ind * 16 + (signal as usize)
         }

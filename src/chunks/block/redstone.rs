@@ -77,11 +77,11 @@ pub fn propagate_signal_at(
             None => {
                 match prev_signal_type {
                     Some(SignalType::Weak(false)) | Some(SignalType::Strong(false)) => {
-                        //  println!("false gods");
+                        println!("false gods");
                         return;
                     }
                     _ => {
-                        //  println!("{:?}", prev_signal_type);
+                        println!("{:?} {input_signal} {previous_signal}", prev_signal_type);
                     }
                 }
             }
@@ -308,7 +308,7 @@ pub fn get_redstone_dust(chunks: &mut Chunks, x: i128, y: i128) -> Option<&mut R
 pub fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut EventListeners) {
     let mut last_orientation = Orientation::Up;
     let mut count = 0;
-    let mut changed: bool =  false;
+    let mut changed: bool = false;
     for orientation in Orientation::iter() {
         let (next_x, next_y) = orientation.get_next_coord(x, y);
         let is_dust_and_open = is_redstone(chunks, next_x, next_y, orientation.get_opposing());
@@ -331,11 +331,12 @@ pub fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut 
 
         if current != initial {
             changed = true;
-        };
+        }
         let (next_x, next_y) = orientation.get_next_coord(x, y);
-        let signal = redstone_dust.signal + 1;
+        let signal = redstone_dust.signal;
         let signal_type = redstone_dust.signal_type;
-        // println!("changed {signal} {:?}", signal_type);
+        // println!("{signal} {:?}", signal_type);
+        println!("changed {signal} {:?}", signal_type);
         propagate_signal_at(
             chunks,
             next_x,
@@ -374,23 +375,13 @@ pub fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut 
     if changed {
         // println!("changed");
         let redstone = get_redstone_dust(chunks, x, y);
-        let dust = if let Some(rs) = redstone{
+        let dust = if let Some(rs) = redstone {
             rs
-        } else{
-            return
+        } else {
+            return;
         };
         let prev_signal = dust.signal + 1;
-        propagate_signal_at(
-            chunks,
-            x,
-            y,
-            None,
-            0,
-            prev_signal,
-            None,
-            listeners,
-            false
-        );
+        propagate_signal_at(chunks, x, y, None, 0, prev_signal, None, listeners, false);
         let prev_redstone = get_max_prev(chunks, x, y);
         //  println!("back {:?}", prev_redstone);
         let (from_port, previous_signal, prev_signal_type) = prev_redstone;
@@ -407,5 +398,4 @@ pub fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut 
             false
         );
     }
-
 }
