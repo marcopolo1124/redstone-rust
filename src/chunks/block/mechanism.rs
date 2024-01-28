@@ -182,7 +182,7 @@ fn move_blocks(
     }
 
     let maybe_blk = chunks.get_block(x, y);
-    let blk = if let Some(blk) = maybe_blk {
+    let mut blk = if let Some(blk) = maybe_blk {
         if blk.movable {
             *blk
         } else {
@@ -208,6 +208,13 @@ fn move_blocks(
     );
     if moved {
         // println!("place and destroy");
+        if let Block{redstone: Some(Redstone{ref mut signal, ref mut signal_type, ..}), ..} = blk{
+            if *signal_type == Some(SignalType::Strong(false)) || *signal_type == Some(SignalType::Weak(false)){
+                *signal = 0;
+                *signal_type = None;
+            }
+        };
+
         place(
             chunks,
             blk,
