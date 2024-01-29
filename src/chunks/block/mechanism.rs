@@ -23,7 +23,6 @@ pub fn execute_mechanism(
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     propagation_queue: &mut PropagationQueue,
     calculations: &mut u32,
-    repropagation_queue: &mut RepropagationQueue
 ) {
     let maybe_blk = chunks.get_block(x, y);
     let blk = if let Some(blk) = maybe_blk {
@@ -61,7 +60,6 @@ pub fn execute_mechanism(
                     listeners,
                     propagation_queue,
                     calculations,
-                    repropagation_queue
                 )
             } else if !on && signal <= 0 {
                 propagate_signal_at(
@@ -75,7 +73,6 @@ pub fn execute_mechanism(
                     listeners,
                     propagation_queue,
                     calculations,
-                    repropagation_queue
                 )
             }
         }
@@ -96,7 +93,6 @@ pub fn execute_mechanism(
                     query,
                     propagation_queue,
                     calculations,
-                    repropagation_queue
                 );
                 if moved {
                     if let Some(extended) = get_extended(chunks, x, y) {
@@ -114,7 +110,6 @@ pub fn execute_mechanism(
                         query,
                         propagation_queue,
                         calculations,
-                        repropagation_queue
                     );
                     listeners.update_entity(x, y);
                 } else {
@@ -137,7 +132,6 @@ pub fn execute_mechanism(
                             query,
                             propagation_queue,
                             calculations,
-                            repropagation_queue
                         );
                     }
                 }
@@ -156,7 +150,6 @@ pub fn execute_mechanism(
                         query,
                         propagation_queue,
                         calculations,
-                        repropagation_queue
                     );
                 }
             }
@@ -195,7 +188,6 @@ pub fn execute_mechanism(
                         listeners,
                         propagation_queue,
                         calculations,
-                        repropagation_queue
                     );
                     if !on {
                         listeners.turn_mechanism_off(x, y)
@@ -212,7 +204,6 @@ pub fn execute_mechanism(
                         listeners,
                         propagation_queue,
                         calculations,
-                        repropagation_queue
                     );
                     if on {
                         listeners.turn_mechanism_on(x, y)
@@ -235,7 +226,6 @@ fn move_blocks(
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     propagation_queue: &mut PropagationQueue,
     calculations: &mut u32,
-    repropagation_queue: &mut RepropagationQueue
 ) -> bool {
     if strength <= 0 {
         return false;
@@ -265,7 +255,6 @@ fn move_blocks(
         query,
         propagation_queue,
         calculations,
-        repropagation_queue
     );
     if moved {
         if
@@ -293,7 +282,6 @@ fn move_blocks(
             query,
             propagation_queue,
             calculations,
-            repropagation_queue
         );
         destroy(
             chunks,
@@ -305,7 +293,6 @@ fn move_blocks(
             query,
             propagation_queue,
             calculations,
-            repropagation_queue
         );
         listeners.update_entity(x, y);
     }

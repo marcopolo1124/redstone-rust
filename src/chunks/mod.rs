@@ -140,7 +140,6 @@ pub fn place(
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     propagation_queue: &mut PropagationQueue,
     calculations: &mut u32,
-    repropagation_queue: &mut RepropagationQueue
 ) -> bool {
     let curr = chunks.get_block(x, y);
     if let Some(_) = curr {
@@ -173,7 +172,7 @@ pub fn place(
     if let Some(rs) = redstone {
         match rs.signal_type {
             Some(SignalType::Strong(true) | SignalType::Weak(true)) => {
-                update_dust_ports(chunks, x, y, listeners, propagation_queue, calculations, repropagation_queue);
+                update_dust_ports(chunks, x, y, listeners, propagation_queue, calculations);
 
                 for orientation in Orientation::iter() {
                     let (next_x, next_y) = orientation.get_next_coord(x, y);
@@ -184,7 +183,6 @@ pub fn place(
                         listeners,
                         propagation_queue,
                         calculations,
-                        repropagation_queue
                     );
                     update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
                 }
@@ -207,7 +205,6 @@ pub fn place(
             listeners,
             propagation_queue,
             calculations,
-            repropagation_queue
         );
     }
 
@@ -226,7 +223,6 @@ pub fn destroy(
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     propagation_queue: &mut PropagationQueue,
     calculations: &mut u32,
-    repropagation_queue: &mut RepropagationQueue
 ) -> bool {
     let curr_blk = chunks.get_maybe_block(x, y);
     *calculations = 0;
@@ -258,7 +254,6 @@ pub fn destroy(
                         listeners,
                         propagation_queue,
                         calculations,
-                        repropagation_queue
                     );
                 }
             }
@@ -276,7 +271,6 @@ pub fn destroy(
                         listeners,
                         propagation_queue,
                         calculations,
-                        repropagation_queue
                     );
                     update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
                 }

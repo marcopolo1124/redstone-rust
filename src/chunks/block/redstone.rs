@@ -11,7 +11,6 @@ pub fn propagate_signal_at(
     listeners: &mut EventListeners,
     propagation_queue: &mut PropagationQueue,
     calculations: &mut u32,
-    repropagation_queue: &mut RepropagationQueue
 ) {
     if (input_signal <= 0 && previous_signal <= 1) || input_signal == 1 {
         return;
@@ -161,12 +160,10 @@ pub fn propagate_signal_at(
                     listeners,
                     propagation_queue,
                     calculations,
-                    repropagation_queue
                 );
             }
         }
     } else if input_signal == 0 {
-        repropagation_queue.append(x, y);
     }
 }
 
@@ -292,7 +289,6 @@ pub fn update_dust_ports(
     listeners: &mut EventListeners,
     propagation_queue: &mut PropagationQueue,
     calculations: &mut u32,
-    repropagation_queue: &mut RepropagationQueue
 ) {
     let mut last_orientation = Orientation::Up;
     let mut count = 0;
@@ -335,7 +331,6 @@ pub fn update_dust_ports(
             listeners,
             propagation_queue,
             calculations,
-            repropagation_queue
         );
     }
 
@@ -380,7 +375,6 @@ pub fn update_dust_ports(
             listeners,
             propagation_queue,
             calculations,
-            repropagation_queue
         );
         let prev_redstone = get_max_prev(chunks, x, y);
 
@@ -397,7 +391,6 @@ pub fn update_dust_ports(
             listeners,
             propagation_queue,
             calculations,
-            repropagation_queue
         );
     }
 }

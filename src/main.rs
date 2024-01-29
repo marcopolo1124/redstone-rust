@@ -69,48 +69,22 @@ struct AutosaveTimer {
     timer: Timer,
 }
 
-#[derive(Resource, Clone, Debug)]
-pub struct RepropagationQueue(HashSet<(i128, i128)>);
-
-impl RepropagationQueue {
-    pub fn append(&mut self, x: i128, y: i128) {
-        self.0.insert((x, y));
-    }
-    pub fn is_empty(&self) -> bool {
-        self.0.len() <= 0
-    }
-
-    pub fn repropagate(
-        &mut self,
-        chunks: &mut Chunks,
-        propagation_queue: &mut PropagationQueue,
-        listeners: &mut EventListeners,
-        calculations: &mut u32
-    ) {
-        let queue = self.0.clone();
-        println!("queue {:?}", queue);
-        self.0.clear();
-        for (x, y) in queue {
-            println!("repropagate {x} {y}");
-            let prev_redstone = get_max_prev(chunks, x, y);
-            let (from_port, previous_signal, prev_signal_type) = prev_redstone;
-            let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
-            propagate_signal_at(
-                chunks,
-                x,
-                y,
-                from_port,
-                transmitted_signal,
-                previous_signal,
-                prev_signal_type,
-                listeners,
-                propagation_queue,
-                calculations,
-                self
-            );
-        }
-    }
-}
+// let prev_redstone = get_max_prev(chunks, x, y);
+// let (from_port, previous_signal, prev_signal_type) = prev_redstone;
+// let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
+// propagate_signal_at(
+//     chunks,
+//     x,
+//     y,
+//     from_port,
+//     transmitted_signal,
+//     previous_signal,
+//     prev_signal_type,
+//     listeners,
+//     propagation_queue,
+//     calculations,
+//     self
+// );
 
 #[derive(Clone, Debug)]
 struct PropagationArgs {
@@ -149,7 +123,6 @@ impl PropagationQueue {
         &mut self,
         chunks: &mut Chunks,
         listeners: &mut EventListeners,
-        repropagation_queue: &mut RepropagationQueue,
         calculations: &mut u32
     ) {
         let queue = self.0.clone();
@@ -167,7 +140,6 @@ impl PropagationQueue {
                 listeners,
                 self,
                 calculations,
-                repropagation_queue
             );
         }
     }
@@ -200,7 +172,6 @@ fn main() {
         .insert_resource(Calculations(0))
         .insert_resource(PropagationQueue(Vec::new()))
         .insert_resource(SelectedBlock(Some(DIRT)))
-        .insert_resource(RepropagationQueue(HashSet::new()))
         .insert_resource(Orientation::Up)
         .insert_resource(Fast(false))
         .insert_resource(
@@ -236,32 +207,18 @@ fn execute_listeners(
     mut listeners: ResMut<EventListeners>,
     mut chunks: ResMut<Chunks>,
     mut propagation_queue: ResMut<PropagationQueue>,
-    mut repropagation_queue: ResMut<RepropagationQueue>,
     mut calculations: ResMut<Calculations>
 ) {
     if propagation_queue.is_empty() {
         return;
     }
-    println!("listener {:?}", repropagation_queue);
 
     propagation_queue.execute_queue(
         &mut chunks,
         &mut listeners,
-        &mut repropagation_queue,
         &mut calculations.0
     );
 
-    if repropagation_queue.is_empty() {
-        return;
-    }
-
-    println!("{:?}", repropagation_queue);
-    repropagation_queue.repropagate(
-        &mut chunks,
-        &mut propagation_queue,
-        &mut listeners,
-        &mut calculations.0
-    )
 }
 
 const DIRT: Block = Block {
@@ -398,8 +355,7 @@ fn init(
     image_assets: Res<ImageAssets>,
     mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     mut propagation_queue: ResMut<PropagationQueue>,
-    mut calculations: ResMut<Calculations>,
-    mut repropagation_queue: ResMut<RepropagationQueue>
+    mut calculations: ResMut<Calculations>
 ) {
     commands.spawn(Camera2dBundle {
         ..default()
@@ -466,7 +422,6 @@ fn init(
                         &mut query,
                         &mut propagation_queue,
                         &mut calculations.0,
-                        &mut repropagation_queue
                     );
                 }
             }
@@ -543,7 +498,6 @@ pub fn mouse_input(
     mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     mut propagation_queue: ResMut<PropagationQueue>,
     mut calculations: ResMut<Calculations>,
-    mut repropagation_queue: ResMut<RepropagationQueue>
 ) {
     let (camera, camera_transform) = q_camera.single();
     let (x, y) = if
@@ -573,7 +527,6 @@ pub fn mouse_input(
                     &mut query,
                     &mut propagation_queue,
                     &mut calculations.0,
-                    &mut repropagation_queue
                 )
             {
                 interact(chunks.as_mut(), x, y, &mut commands, &image_assets, &mut query);
@@ -590,7 +543,6 @@ pub fn mouse_input(
             &mut query,
             &mut propagation_queue,
             &mut calculations.0,
-            &mut repropagation_queue
         );
     }
 }
@@ -768,7 +720,6 @@ fn mechanism_listener(
     mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     mut propagation_queue: ResMut<PropagationQueue>,
     mut calculations: ResMut<Calculations>,
-    mut repropagation_queue: ResMut<RepropagationQueue>
 ) {
     if !propagation_queue.is_empty() {
         return;
@@ -792,7 +743,6 @@ fn mechanism_listener(
             &mut query,
             &mut propagation_queue,
             &mut calculations.0,
-            &mut repropagation_queue
         );
     }
 }
