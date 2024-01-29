@@ -3,7 +3,6 @@ pub use super::*;
 mod block;
 pub use block::*;
 
-
 use bevy::utils::HashMap;
 
 pub const CHUNK_SIZE: (i128, i128) = (16, 16);
@@ -138,7 +137,9 @@ pub fn place(
     listeners: &mut EventListeners,
     commands: &mut Commands,
     image_assets: &ImageAssets,
-    query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
+    query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>,
+    propagation_queue: &mut PropagationQueue,
+    calculations: &mut u32
 ) -> bool {
     let curr = chunks.get_block(x, y);
     if let Some(_) = curr {
@@ -166,26 +167,29 @@ pub fn place(
         ..blk
     });
 
-    
-
-    if let Some(rs) = redstone{
-
-        match rs.signal_type{
+    if let Some(rs) = redstone {
+        match rs.signal_type {
             Some(SignalType::Strong(true) | SignalType::Weak(true)) => {
-                update_dust_ports(chunks, x, y, listeners);
-        
+                update_dust_ports(chunks, x, y, listeners, propagation_queue, calculations);
+
                 for orientation in Orientation::iter() {
                     let (next_x, next_y) = orientation.get_next_coord(x, y);
-                    update_dust_ports(chunks, next_x, next_y, listeners);
+                    update_dust_ports(
+                        chunks,
+                        next_x,
+                        next_y,
+                        listeners,
+                        propagation_queue,
+                        calculations
+                    );
                     update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
                 }
-            },
+            }
             _ => {}
         }
 
-    
         // chunks.// print_chunks();
-    
+
         let prev_redstone = get_max_prev(chunks, x, y);
         let (from_port, previous_signal, prev_signal_type) = prev_redstone;
         let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
@@ -199,12 +203,13 @@ pub fn place(
             previous_signal,
             prev_signal_type,
             listeners,
-            false
+            propagation_queue,
+            calculations
         );
     }
-    
+
     update_entity(commands, &mut chunks, x, y, image_assets, query);
-    
+
     return true;
 }
 
@@ -215,7 +220,9 @@ pub fn destroy(
     listeners: &mut EventListeners,
     commands: &mut Commands,
     image_assets: &ImageAssets,
-    query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
+    query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>,
+    propagation_queue: &mut PropagationQueue,
+    calculations: &mut u32
 ) -> bool {
     //  // println!("");
     //  // println!("destroy {x} {y}");
@@ -248,19 +255,29 @@ pub fn destroy(
                         curr_signal,
                         curr_signal_type,
                         listeners,
-                        false
+                        propagation_queue,
+                        calculations
                     );
                 }
             }
 
-            if curr_signal_type == Some(SignalType::Strong(true)) || curr_signal_type == Some(SignalType::Weak(true)) {
+            if
+                curr_signal_type == Some(SignalType::Strong(true)) ||
+                curr_signal_type == Some(SignalType::Weak(true))
+            {
                 for orientation in Orientation::iter() {
                     let (next_x, next_y) = orientation.get_next_coord(x, y);
-                    update_dust_ports(chunks, next_x, next_y, listeners);
+                    update_dust_ports(
+                        chunks,
+                        next_x,
+                        next_y,
+                        listeners,
+                        propagation_queue,
+                        calculations
+                    );
                     update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
                 }
             }
-
         } else {
             *mutref = None;
             update_entity(commands, &mut chunks, x, y, image_assets, query);
@@ -268,12 +285,7 @@ pub fn destroy(
     }
 
     listeners.remove_mechanism(x, y);
-    
+
     //  // println!("update");
     return true;
 }
-
-
-
-
-

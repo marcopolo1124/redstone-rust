@@ -9,9 +9,10 @@ pub fn propagate_signal_at(
     previous_signal: u8,
     prev_signal_type: Option<SignalType>,
     listeners: &mut EventListeners,
-    from_list: bool
+    propagation_queue: &mut PropagationQueue,
+    calculations: &mut u32
 ) {
-    //  // println!("called with input {input_signal} {previous_signal}");
+
     if input_signal <= 0 && previous_signal <= 1 {
         //  // println!("too little");
         return;
@@ -42,6 +43,8 @@ pub fn propagate_signal_at(
             return;
         }
     };
+
+
     // if there is an input signal, filter out all signals that will not continue propagation
     // Cases are: Weak signal from opaque block going to redstone dust
     // triggering a mechanism. In cases of redstone torch it will propagate on the next tick
@@ -94,6 +97,12 @@ pub fn propagate_signal_at(
         }
     }
 
+    *calculations += 1;
+    // println!("on step {calculations}");
+    if *calculations > 10000 {
+        propagation_queue.append(x, y, input_signal, from_port, previous_signal, prev_signal_type);
+        return
+    }
     //input signal > current signal -> turning on
     // previous signal > current signal -> can be either turning on or off
     //  // println!("input {input_signal} sig {}", *signal);
@@ -184,7 +193,8 @@ pub fn propagate_signal_at(
                     current_signal,
                     Some(port_output_signal_type),
                     listeners,
-                    from_list
+                    propagation_queue,
+                    calculations
                 );
             }
         }
@@ -205,7 +215,8 @@ pub fn propagate_signal_at(
             previous_signal,
             prev_signal_type,
             listeners,
-            from_list
+            propagation_queue,
+            calculations
         );
     }
 }
@@ -246,7 +257,15 @@ pub fn get_max_prev(
                 let Some(
                     Some(
                         Block {
-                            redstone: Some(Redstone { signal, output_ports, signal_type, signal_type_port_mapping, .. }),
+                            redstone: Some(
+                                Redstone {
+                                    signal,
+                                    output_ports,
+                                    signal_type,
+                                    signal_type_port_mapping,
+                                    ..
+                                },
+                            ),
                             ..
                         },
                     ),
@@ -259,9 +278,10 @@ pub fn get_max_prev(
                 {
                     max_signal = *signal;
                     max_signal_loc = Some(port_orientation);
-                    let output_port_signal_type = signal_type_port_mapping[port_orientation.get_opposing().to_port_idx()];
+                    let output_port_signal_type =
+                        signal_type_port_mapping[port_orientation.get_opposing().to_port_idx()];
                     let mut signal_type = *signal_type;
-                    if let Some(sig_type) = output_port_signal_type{
+                    if let Some(sig_type) = output_port_signal_type {
                         signal_type = Some(sig_type);
                     }
 
@@ -320,7 +340,14 @@ pub fn get_redstone_dust(chunks: &mut Chunks, x: i128, y: i128) -> Option<&mut R
     Some(redstone)
 }
 
-pub fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut EventListeners) {
+pub fn update_dust_ports(
+    chunks: &mut Chunks,
+    x: i128,
+    y: i128,
+    listeners: &mut EventListeners,
+    propagation_queue: &mut PropagationQueue,
+    calculations: &mut u32
+) {
     let mut last_orientation = Orientation::Up;
     let mut count = 0;
     let mut changed: bool = false;
@@ -361,7 +388,8 @@ pub fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut 
             signal,
             signal_type,
             listeners,
-            false
+            propagation_queue,
+            calculations
         );
     }
 
@@ -396,7 +424,18 @@ pub fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut 
             return;
         };
         let prev_signal = dust.signal + 1;
-        propagate_signal_at(chunks, x, y, None, 0, prev_signal, None, listeners, false);
+        propagate_signal_at(
+            chunks,
+            x,
+            y,
+            None,
+            0,
+            prev_signal,
+            None,
+            listeners,
+            propagation_queue,
+            calculations
+        );
         let prev_redstone = get_max_prev(chunks, x, y);
         //  // println!("back {:?}", prev_redstone);
         let (from_port, previous_signal, prev_signal_type) = prev_redstone;
@@ -410,7 +449,8 @@ pub fn update_dust_ports(chunks: &mut Chunks, x: i128, y: i128, listeners: &mut 
             previous_signal,
             prev_signal_type,
             listeners,
-            false
+            propagation_queue,
+            calculations
         );
     }
 }
