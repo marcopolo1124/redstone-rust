@@ -123,6 +123,6 @@ pub struct BlockComponent;
 pub fn toggle_port(redstone: &mut Redstone, orientation: Orientation, on: bool) {
     let Redstone { output_ports, .. } = redstone;
     let idx = orientation.to_port_idx();
-    // input_ports[idx] = on;
+
     output_ports[idx] = on;
 }

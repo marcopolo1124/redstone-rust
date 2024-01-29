@@ -24,6 +24,7 @@ const BOX_WIDTH: f32 = 48.0;
 pub struct EventListeners {
     pub entity_map_update: HashSet<(i128, i128)>,
     pub mechanism_listener: HashMap<(i128, i128), bool>,
+    pub repropagation_listener: HashSet<(i128, i128)>,
 }
 
 impl EventListeners {
@@ -31,6 +32,7 @@ impl EventListeners {
         EventListeners {
             entity_map_update: HashSet::new(),
             mechanism_listener: HashMap::new(),
+            repropagation_listener: HashSet::new(),
         }
     }
 
@@ -47,6 +49,10 @@ impl EventListeners {
     }
     pub fn remove_mechanism(&mut self, x: i128, y: i128) {
         self.mechanism_listener.remove(&(x, y));
+    }
+
+    pub fn repropagate(&mut self, x: i128, y: i128) {
+        self.repropagation_listener.insert((x, y));
     }
 }
 
@@ -69,7 +75,73 @@ struct AutosaveTimer {
     timer: Timer,
 }
 
+#[derive(Clone, Debug)]
+struct PropagationArgs {
+    x: i128,
+    y: i128,
+    input_signal: u8,
+    from_port: Option<Orientation>,
+    previous_signal: u8,
+    prev_signal_type: Option<SignalType>,
+}
+
+#[derive(Resource, Debug)]
+pub struct PropagationQueue(Vec<PropagationArgs>);
+
+impl PropagationQueue {
+    pub fn append(
+        &mut self,
+        x: i128,
+        y: i128,
+        input_signal: u8,
+        from_port: Option<Orientation>,
+        previous_signal: u8,
+        prev_signal_type: Option<SignalType>
+    ) {
+        self.0.push(PropagationArgs {
+            x,
+            y,
+            input_signal,
+            from_port,
+            previous_signal,
+            prev_signal_type,
+        })
+    }
+
+    fn execute_queue(
+        &mut self,
+        chunks: &mut Chunks,
+        listeners: &mut EventListeners,
+        calculations: &mut u32
+    ) {
+        let queue = self.0.clone();
+        self.0.clear();
+        *calculations = 0;
+        for job in queue.iter() {
+            propagate_signal_at(
+                chunks,
+                job.x,
+                job.y,
+                job.from_port,
+                job.input_signal,
+                job.previous_signal,
+                job.prev_signal_type,
+                listeners,
+                self,
+                calculations
+            );
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.len() <= 0
+    }
+}
+
 const TICK: f64 = 0.1;
+
+#[derive(Resource)]
+pub struct Calculations(u32);
 
 fn main() {
     let chunks = Chunks::new();
@@ -86,6 +158,8 @@ fn main() {
         .insert_resource(Msaa::Off)
         .insert_resource(chunks)
         .insert_resource(event_listeners)
+        .insert_resource(Calculations(0))
+        .insert_resource(PropagationQueue(Vec::new()))
         .insert_resource(SelectedBlock(Some(DIRT)))
         .insert_resource(Orientation::Up)
         .insert_resource(Fast(false))
@@ -106,15 +180,30 @@ fn main() {
         )
         .add_systems(OnEnter(MyStates::InGame), init)
         .add_systems(FixedUpdate, mechanism_listener.run_if(in_state(MyStates::InGame)))
+        .add_systems(Update, repropagation_listener.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, mouse_input.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, update_selected_block.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, update_entity_listener.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, move_camera.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, update_orientation.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, autosave.run_if(in_state(MyStates::InGame)))
+        .add_systems(Update, execute_listeners.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, zoom_camera.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, update_tick)
         .run()
+}
+
+fn execute_listeners(
+    mut listeners: ResMut<EventListeners>,
+    mut chunks: ResMut<Chunks>,
+    mut propagation_queue: ResMut<PropagationQueue>,
+    mut calculations: ResMut<Calculations>
+) {
+    if propagation_queue.is_empty() {
+        return;
+    }
+
+    propagation_queue.execute_queue(&mut chunks, &mut listeners, &mut calculations.0);
 }
 
 const DIRT: Block = Block {
@@ -249,7 +338,9 @@ fn init(
     mut chunks: ResMut<Chunks>,
     mut listeners: ResMut<EventListeners>,
     image_assets: Res<ImageAssets>,
-    mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>
+    mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>,
+    mut propagation_queue: ResMut<PropagationQueue>,
+    mut calculations: ResMut<Calculations>
 ) {
     commands.spawn(Camera2dBundle {
         ..default()
@@ -313,7 +404,9 @@ fn init(
                         &mut listeners,
                         &mut commands,
                         &image_assets,
-                        &mut query
+                        &mut query,
+                        &mut propagation_queue,
+                        &mut calculations.0
                     );
                 }
             }
@@ -363,20 +456,19 @@ struct Fast(bool);
 
 fn update_tick(
     keyboard_input: Res<Input<KeyCode>>,
-    mut time: ResMut<Time::<Fixed>>,
+    mut time: ResMut<Time<Fixed>>,
     mut fast: ResMut<Fast>
 ) {
     if keyboard_input.pressed(KeyCode::E) {
         fast.0 = !fast.0;
         let mutable = time.as_mut();
-        if fast.0{
+        if fast.0 {
             *mutable = Time::from_seconds(0.005);
-        } else{
+        } else {
             *mutable = Time::from_seconds(TICK);
         }
     }
 }
-
 
 pub fn mouse_input(
     mut commands: Commands,
@@ -388,7 +480,9 @@ pub fn mouse_input(
     q_windows: Query<&Window, With<PrimaryWindow>>,
     q_camera: Query<(&Camera, &GlobalTransform)>,
     image_assets: Res<ImageAssets>,
-    mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>
+    mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>,
+    mut propagation_queue: ResMut<PropagationQueue>,
+    mut calculations: ResMut<Calculations>
 ) {
     let (camera, camera_transform) = q_camera.single();
     let (x, y) = if
@@ -404,7 +498,6 @@ pub fn mouse_input(
     };
 
     if buttons.just_pressed(MouseButton::Right) {
-        //  // println!("click at {x} {y}");
         if let Some(blk) = selected_block.get_block() {
             if
                 !place(
@@ -416,14 +509,26 @@ pub fn mouse_input(
                     &mut listeners,
                     &mut commands,
                     &image_assets,
-                    &mut query
+                    &mut query,
+                    &mut propagation_queue,
+                    &mut calculations.0
                 )
             {
                 interact(chunks.as_mut(), x, y, &mut commands, &image_assets, &mut query);
             }
         }
     } else if buttons.just_pressed(MouseButton::Left) {
-        destroy(chunks.as_mut(), x, y, &mut listeners, &mut commands, &image_assets, &mut query);
+        destroy(
+            chunks.as_mut(),
+            x,
+            y,
+            &mut listeners,
+            &mut commands,
+            &image_assets,
+            &mut query,
+            &mut propagation_queue,
+            &mut calculations.0
+        );
     }
 }
 
@@ -436,10 +541,14 @@ fn get_mouse_coord(x: f32, y: f32) -> (i128, i128) {
 fn update_entity_listener(
     mut commands: Commands,
     mut listeners: ResMut<EventListeners>,
+    propagation_queue: ResMut<PropagationQueue>,
     image_assets: Res<ImageAssets>,
     mut chunks: ResMut<Chunks>,
     mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) {
+    if !propagation_queue.is_empty() {
+        return;
+    }
     for (x, y) in &listeners.entity_map_update {
         update_entity(&mut commands, &mut chunks, *x, *y, &image_assets, &mut query);
     }
@@ -470,7 +579,7 @@ fn get_state(blk: Block) -> usize {
             ..
         } => {
             let conn_ind = get_connection(&output_ports);
-            //  // println!("{conn_ind}");
+
             conn_ind * 16 + (signal as usize)
         }
         Block {
@@ -504,8 +613,6 @@ fn update_entity(
     image_assets: &ImageAssets,
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) {
-    //  // println!("{:?}", chunks);
-    //  // println!("updating entity {x} {y}");
     let curr_blk = chunks.get_block(x, y).clone();
     let curr_entity = chunks.get_entity(x, y);
 
@@ -544,14 +651,12 @@ fn update_entity(
             *curr_entity = Some(handle);
         }
     } else {
-        //  // println!("entity deleting {x} {y} {:?}", curr_entity);
         if let Some(entity_handle) = curr_entity {
             commands.entity(*entity_handle).despawn();
         }
 
         *curr_entity = None;
         chunks.delete_chunk(x, y);
-        //  // println!("{:?}", chunks);
     }
 }
 
@@ -597,8 +702,17 @@ fn mechanism_listener(
     mut chunks: ResMut<Chunks>,
     mut commands: Commands,
     image_assets: Res<ImageAssets>,
-    mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>
+    mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>,
+    mut propagation_queue: ResMut<PropagationQueue>,
+    mut calculations: ResMut<Calculations>
 ) {
+    if !propagation_queue.is_empty() {
+        return;
+    }
+
+    let calc = &mut calculations.0;
+    *calc = 0;
+
     let mechanism_listener = listeners.mechanism_listener.clone();
     listeners.mechanism_listener.clear();
 
@@ -611,7 +725,37 @@ fn mechanism_listener(
             &mut listeners,
             &mut commands,
             &image_assets,
-            &mut query
+            &mut query,
+            &mut propagation_queue,
+            &mut calculations.0
+        );
+    }
+}
+
+fn repropagation_listener(
+    mut listeners: ResMut<EventListeners>,
+    mut chunks: ResMut<Chunks>,
+    mut propagation_queue: ResMut<PropagationQueue>,
+    mut calculations: ResMut<Calculations>
+) {
+    let queue = listeners.repropagation_listener.clone();
+    listeners.repropagation_listener.clear();
+
+    for (x, y) in queue {
+        let prev_redstone = get_max_prev(&mut chunks, x, y);
+        let (from_port, previous_signal, prev_signal_type) = prev_redstone;
+        let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
+        propagate_signal_at(
+            &mut chunks,
+            x,
+            y,
+            from_port,
+            transmitted_signal,
+            previous_signal,
+            prev_signal_type,
+            &mut listeners,
+            &mut propagation_queue,
+            &mut calculations.0,
         );
     }
 }
@@ -662,7 +806,6 @@ pub fn zoom_camera(
     if let Ok(mut transform) = query.get_single_mut() {
         let mut scale_delta = 0.0;
         for ev in scroll_evr.read() {
-            //  // println!("scrolled");
             match ev.unit {
                 MouseScrollUnit::Line => {
                     let new_scale_delta = scale_delta + 0.1 * ev.y;
@@ -675,11 +818,6 @@ pub fn zoom_camera(
                             scale_delta = -0.2;
                         }
                     }
-                    // let new_scale = transform.scale + 0.1 * ev.y;
-                    // if new_scale > 0.0 {
-                    //     transform.scale = new_scale;
-                    // } else {
-                    // }
                 }
                 MouseScrollUnit::Pixel => {
                     let new_scale_delta = scale_delta + 0.1 * ev.y;
@@ -692,11 +830,6 @@ pub fn zoom_camera(
                             scale_delta = -0.2;
                         }
                     }
-                    // let new_scale = transform.scale + 0.1 * ev.y;
-                    // if new_scale > 0.0 {
-                    //     transform.scale = new_scale;
-                    // } else {
-                    // }
                 }
             }
         }
@@ -706,6 +839,5 @@ pub fn zoom_camera(
         } else {
             transform.scale = 0.0;
         }
-        // transform.scale = std::cmp::max(0.0, transform.scale + scale_delta);
     }
 }

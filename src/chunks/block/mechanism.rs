@@ -20,7 +20,9 @@ pub fn execute_mechanism(
     listeners: &mut EventListeners,
     mut commands: &mut Commands,
     image_assets: &ImageAssets,
-    query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
+    query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>,
+    propagation_queue: &mut PropagationQueue,
+    calculations: &mut u32,
 ) {
     let maybe_blk = chunks.get_block(x, y);
     let blk = if let Some(blk) = maybe_blk {
@@ -41,25 +43,43 @@ pub fn execute_mechanism(
 
     match mechanism_kind {
         MechanismKind::RedstoneTorch => {
-            //  // println!("torch, {:?} {on}", redstone);
             let signal = if let Some(Redstone { signal, .. }) = redstone {
                 signal
             } else {
                 return;
             };
             if on && signal > 0 {
-                //  // println!("turning off");
-                propagate_signal_at(chunks, x, y, None, 0, 17, None, listeners, true)
+                propagate_signal_at(
+                    chunks,
+                    x,
+                    y,
+                    None,
+                    0,
+                    17,
+                    None,
+                    listeners,
+                    propagation_queue,
+                    calculations,
+                )
             } else if !on && signal <= 0 {
-                //  // println!("turning on");
-                propagate_signal_at(chunks, x, y, None, 16, 16, None, listeners, true)
+                propagate_signal_at(
+                    chunks,
+                    x,
+                    y,
+                    None,
+                    16,
+                    16,
+                    None,
+                    listeners,
+                    propagation_queue,
+                    calculations,
+                )
             }
         }
         MechanismKind::Piston { ref mut extended, sticky } => {
             let is_sticky = *sticky;
             let piston_head = if is_sticky { STICKY_PISTON_HEAD } else { PISTON_HEAD };
             if !*extended && on {
-                //  // println!("moved");
                 let (next_x, next_y) = orientation.get_next_coord(x, y);
                 let moved = move_blocks(
                     chunks,
@@ -70,7 +90,9 @@ pub fn execute_mechanism(
                     listeners,
                     &mut commands,
                     &image_assets,
-                    query
+                    query,
+                    propagation_queue,
+                    calculations,
                 );
                 if moved {
                     if let Some(extended) = get_extended(chunks, x, y) {
@@ -85,10 +107,12 @@ pub fn execute_mechanism(
                         listeners,
                         &mut commands,
                         &image_assets,
-                        query
+                        query,
+                        propagation_queue,
+                        calculations,
                     );
                     listeners.update_entity(x, y);
-                } else{
+                } else {
                     listeners.turn_mechanism_on(x, y)
                 }
             } else if *extended && !on {
@@ -105,7 +129,9 @@ pub fn execute_mechanism(
                             listeners,
                             &mut commands,
                             &image_assets,
-                            query
+                            query,
+                            propagation_queue,
+                            calculations,
                         );
                     }
                 }
@@ -121,7 +147,9 @@ pub fn execute_mechanism(
                         listeners,
                         &mut commands,
                         &image_assets,
-                        query
+                        query,
+                        propagation_queue,
+                        calculations,
                     );
                 }
             }
@@ -149,12 +177,34 @@ pub fn execute_mechanism(
             } else if *countdown == 0 {
                 *countdown -= 1;
                 if signal <= 0 {
-                    propagate_signal_at(chunks, x, y, None, 16, 16, None, listeners, true);
+                    propagate_signal_at(
+                        chunks,
+                        x,
+                        y,
+                        None,
+                        16,
+                        16,
+                        None,
+                        listeners,
+                        propagation_queue,
+                        calculations,
+                    );
                     if !on {
                         listeners.turn_mechanism_off(x, y)
                     }
                 } else {
-                    propagate_signal_at(chunks, x, y, None, 0, 17, None, listeners, true);
+                    propagate_signal_at(
+                        chunks,
+                        x,
+                        y,
+                        None,
+                        0,
+                        17,
+                        None,
+                        listeners,
+                        propagation_queue,
+                        calculations,
+                    );
                     if on {
                         listeners.turn_mechanism_on(x, y)
                     }
@@ -173,11 +223,11 @@ fn move_blocks(
     listeners: &mut EventListeners,
     mut commands: &mut Commands,
     image_assets: &ImageAssets,
-    query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
+    query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>,
+    propagation_queue: &mut PropagationQueue,
+    calculations: &mut u32,
 ) -> bool {
-    //  // println!("called moved blocks");
     if strength <= 0 {
-        //  // println!("no strength");
         return false;
     }
 
@@ -186,11 +236,9 @@ fn move_blocks(
         if blk.movable {
             *blk
         } else {
-            //  // println!("block not movable");
             return false;
         }
     } else {
-        //  // println!("none");
         return true;
     };
 
@@ -204,16 +252,23 @@ fn move_blocks(
         listeners,
         &mut commands,
         &image_assets,
-        query
+        query,
+        propagation_queue,
+        calculations,
     );
     if moved {
-        //  // println!("place and destroy");
-        if let Block{redstone: Some(Redstone{ref mut signal, ref mut signal_type, ..}), ..} = blk{
-            if *signal_type == Some(SignalType::Strong(false)) || *signal_type == Some(SignalType::Weak(false)){
+        if
+            let Block { redstone: Some(Redstone { ref mut signal, ref mut signal_type, .. }), .. } =
+                blk
+        {
+            if
+                *signal_type == Some(SignalType::Strong(false)) ||
+                *signal_type == Some(SignalType::Weak(false))
+            {
                 *signal = 0;
                 *signal_type = None;
             }
-        };
+        }
 
         place(
             chunks,
@@ -224,9 +279,21 @@ fn move_blocks(
             listeners,
             &mut commands,
             &image_assets,
-            query
+            query,
+            propagation_queue,
+            calculations,
         );
-        destroy(chunks, x, y, listeners, &mut commands, &image_assets, query);
+        destroy(
+            chunks,
+            x,
+            y,
+            listeners,
+            &mut commands,
+            &image_assets,
+            query,
+            propagation_queue,
+            calculations,
+        );
         listeners.update_entity(x, y);
     }
 

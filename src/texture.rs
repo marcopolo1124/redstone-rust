@@ -1,6 +1,5 @@
-// use bevy::prelude::*;
 pub use super::*;
-// use bevy_asset_loader::asset_collection::AssetCollection;
+
 use bevy_asset_loader::prelude::*;
 
 #[derive(AssetCollection, Resource)]
@@ -47,7 +46,7 @@ pub struct ImageAssets {
 
     #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 176, rows = 1))]
     #[asset(path = "images/redstone_dust_var.png")]
-    #[asset(image(sampler = nearest))] 
+    #[asset(image(sampler = nearest))]
     redstone_dust_var: Handle<TextureAtlas>,
 }
 
@@ -57,13 +56,12 @@ pub fn get_atlas(texture_name: TextureName, image_assets: &ImageAssets) -> Handl
         TextureName::RedstoneTorch => image_assets.redstone_torch.clone(),
         TextureName::RedstoneCross => image_assets.redstone_dust.clone(),
         TextureName::RedstoneDust => image_assets.redstone_dust_var.clone(),
-        TextureName::Piston  => image_assets.piston.clone(),
-        TextureName::StickyPiston  => image_assets.sticky_piston.clone(),
+        TextureName::Piston => image_assets.piston.clone(),
+        TextureName::StickyPiston => image_assets.sticky_piston.clone(),
         TextureName::PistonHead => image_assets.piston_head.clone(),
         TextureName::StickyPistonHead => image_assets.sticky_piston_head.clone(),
         TextureName::Repeater => image_assets.repeater.clone(),
     }
-    // image_assets.dirt.clone()
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Hash, Eq, Serialize, Deserialize)]
@@ -76,5 +74,5 @@ pub enum TextureName {
     StickyPiston,
     PistonHead,
     StickyPistonHead,
-    Repeater
+    Repeater,
 }
