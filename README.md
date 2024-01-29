@@ -9,7 +9,7 @@ select block using number keys:
 5. sticky piston
 6. repeater
 
-right click to place block or increment repeater tick
-left click to destory block
-arrow keys to change direction the block points when placed
-WASD to move around the map
+- right click to place block or increment repeater tick
+- left click to destory block
+- arrow keys to change direction the block points when placed
+- WASD to move around the map
