@@ -23,18 +23,6 @@ impl Chunk {
             entity_map: [[None; CHUNK_SIZE.0 as usize]; CHUNK_SIZE.1 as usize],
         }
     }
-
-    fn print_chunk(&self) {
-        for row in self.map {
-            let mut debug = [0; CHUNK_SIZE.0 as usize];
-            for (idx, x) in row.iter().enumerate() {
-                if let Some(_) = x {
-                    debug[idx] = 1;
-                }
-            }
-            //  println!("{:?}", debug);
-        }
-    }
 }
 
 #[derive(Debug, Resource)]
@@ -139,13 +127,6 @@ impl Chunks {
             panic!("Chunk should exist");
         }
     }
-
-    pub fn print_chunks(&self) {
-        for (_, v) in self.0.iter() {
-            //  println!("chunk at {:?}", k);
-            v.print_chunk();
-        }
-    }
 }
 
 pub fn place(
@@ -203,12 +184,12 @@ pub fn place(
         }
 
     
-        // chunks.print_chunks();
+        // chunks.// print_chunks();
     
         let prev_redstone = get_max_prev(chunks, x, y);
         let (from_port, previous_signal, prev_signal_type) = prev_redstone;
         let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
-        //  println!("prev redstone 2{:?}", prev_redstone);
+        //  // println!("prev redstone 2{:?}", prev_redstone);
         propagate_signal_at(
             chunks,
             x,
@@ -236,8 +217,8 @@ pub fn destroy(
     image_assets: &ImageAssets,
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) -> bool {
-    //  println!("");
-    //  println!("destroy {x} {y}");
+    //  // println!("");
+    //  // println!("destroy {x} {y}");
     let curr_blk = chunks.get_maybe_block(x, y);
     if let Some(mutref) = curr_blk {
         if
@@ -250,7 +231,7 @@ pub fn destroy(
             let curr_output_ports = *output_ports;
             *mutref = None;
             update_entity(commands, &mut chunks, x, y, image_assets, query);
-            // chunks.print_chunks();
+            // chunks.// print_chunks();
             // let transmitted_signal = if curr_signal < 1 { 0 } else { curr_signal - 1 };
 
             for (idx, port) in curr_output_ports.iter().enumerate() {
@@ -288,7 +269,7 @@ pub fn destroy(
 
     listeners.remove_mechanism(x, y);
     
-    //  println!("update");
+    //  // println!("update");
     return true;
 }
 
