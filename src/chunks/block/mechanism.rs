@@ -43,14 +43,12 @@ pub fn execute_mechanism(
 
     match mechanism_kind {
         MechanismKind::RedstoneTorch => {
-            //  // println!("torch, {:?} {on}", redstone);
             let signal = if let Some(Redstone { signal, .. }) = redstone {
                 signal
             } else {
                 return;
             };
             if on && signal > 0 {
-                //  // println!("turning off");
                 propagate_signal_at(
                     chunks,
                     x,
@@ -64,7 +62,6 @@ pub fn execute_mechanism(
                     calculations
                 )
             } else if !on && signal <= 0 {
-                //  // println!("turning on");
                 propagate_signal_at(
                     chunks,
                     x,
@@ -83,7 +80,6 @@ pub fn execute_mechanism(
             let is_sticky = *sticky;
             let piston_head = if is_sticky { STICKY_PISTON_HEAD } else { PISTON_HEAD };
             if !*extended && on {
-                //  // println!("moved");
                 let (next_x, next_y) = orientation.get_next_coord(x, y);
                 let moved = move_blocks(
                     chunks,
@@ -231,9 +227,7 @@ fn move_blocks(
     propagation_queue: &mut PropagationQueue,
     calculations: &mut u32
 ) -> bool {
-    //  // println!("called moved blocks");
     if strength <= 0 {
-        //  // println!("no strength");
         return false;
     }
 
@@ -242,11 +236,9 @@ fn move_blocks(
         if blk.movable {
             *blk
         } else {
-            //  // println!("block not movable");
             return false;
         }
     } else {
-        //  // println!("none");
         return true;
     };
 
@@ -265,7 +257,6 @@ fn move_blocks(
         calculations
     );
     if moved {
-        //  // println!("place and destroy");
         if
             let Block { redstone: Some(Redstone { ref mut signal, ref mut signal_type, .. }), .. } =
                 blk

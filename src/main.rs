@@ -488,7 +488,6 @@ pub fn mouse_input(
     };
 
     if buttons.just_pressed(MouseButton::Right) {
-        //  // println!("click at {x} {y}");
         if let Some(blk) = selected_block.get_block() {
             if
                 !place(
@@ -570,7 +569,7 @@ fn get_state(blk: Block) -> usize {
             ..
         } => {
             let conn_ind = get_connection(&output_ports);
-            //  // println!("{conn_ind}");
+
             conn_ind * 16 + (signal as usize)
         }
         Block {
@@ -604,8 +603,6 @@ fn update_entity(
     image_assets: &ImageAssets,
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) {
-    //  // println!("{:?}", chunks);
-    //  // println!("updating entity {x} {y}");
     let curr_blk = chunks.get_block(x, y).clone();
     let curr_entity = chunks.get_entity(x, y);
 
@@ -644,14 +641,12 @@ fn update_entity(
             *curr_entity = Some(handle);
         }
     } else {
-        //  // println!("entity deleting {x} {y} {:?}", curr_entity);
         if let Some(entity_handle) = curr_entity {
             commands.entity(*entity_handle).despawn();
         }
 
         *curr_entity = None;
         chunks.delete_chunk(x, y);
-        //  // println!("{:?}", chunks);
     }
 }
 
@@ -770,7 +765,6 @@ pub fn zoom_camera(
     if let Ok(mut transform) = query.get_single_mut() {
         let mut scale_delta = 0.0;
         for ev in scroll_evr.read() {
-            //  // println!("scrolled");
             match ev.unit {
                 MouseScrollUnit::Line => {
                     let new_scale_delta = scale_delta + 0.1 * ev.y;
@@ -783,11 +777,6 @@ pub fn zoom_camera(
                             scale_delta = -0.2;
                         }
                     }
-                    // let new_scale = transform.scale + 0.1 * ev.y;
-                    // if new_scale > 0.0 {
-                    //     transform.scale = new_scale;
-                    // } else {
-                    // }
                 }
                 MouseScrollUnit::Pixel => {
                     let new_scale_delta = scale_delta + 0.1 * ev.y;
@@ -800,11 +789,6 @@ pub fn zoom_camera(
                             scale_delta = -0.2;
                         }
                     }
-                    // let new_scale = transform.scale + 0.1 * ev.y;
-                    // if new_scale > 0.0 {
-                    //     transform.scale = new_scale;
-                    // } else {
-                    // }
                 }
             }
         }
@@ -814,6 +798,5 @@ pub fn zoom_camera(
         } else {
             transform.scale = 0.0;
         }
-        // transform.scale = std::cmp::max(0.0, transform.scale + scale_delta);
     }
 }

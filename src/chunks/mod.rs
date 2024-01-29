@@ -188,12 +188,10 @@ pub fn place(
             _ => {}
         }
 
-        // chunks.// print_chunks();
-
         let prev_redstone = get_max_prev(chunks, x, y);
         let (from_port, previous_signal, prev_signal_type) = prev_redstone;
         let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
-        //  // println!("prev redstone 2{:?}", prev_redstone);
+
         propagate_signal_at(
             chunks,
             x,
@@ -224,8 +222,6 @@ pub fn destroy(
     propagation_queue: &mut PropagationQueue,
     calculations: &mut u32
 ) -> bool {
-    //  // println!("");
-    //  // println!("destroy {x} {y}");
     let curr_blk = chunks.get_maybe_block(x, y);
     if let Some(mutref) = curr_blk {
         if
@@ -238,8 +234,6 @@ pub fn destroy(
             let curr_output_ports = *output_ports;
             *mutref = None;
             update_entity(commands, &mut chunks, x, y, image_assets, query);
-            // chunks.// print_chunks();
-            // let transmitted_signal = if curr_signal < 1 { 0 } else { curr_signal - 1 };
 
             for (idx, port) in curr_output_ports.iter().enumerate() {
                 if *port {
@@ -286,6 +280,5 @@ pub fn destroy(
 
     listeners.remove_mechanism(x, y);
 
-    //  // println!("update");
     return true;
 }

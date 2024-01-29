@@ -12,9 +12,7 @@ pub fn propagate_signal_at(
     propagation_queue: &mut PropagationQueue,
     calculations: &mut u32
 ) {
-
     if input_signal <= 0 && previous_signal <= 1 {
-        //  // println!("too little");
         return;
     }
 
@@ -39,56 +37,36 @@ pub fn propagate_signal_at(
             },
         ) => (signal, signal_type, kind, input_ports, output_ports, signal_type_port_mapping),
         _ => {
-            // println!("no block");
             return;
         }
     };
 
-
-    // if there is an input signal, filter out all signals that will not continue propagation
-    // Cases are: Weak signal from opaque block going to redstone dust
-    // triggering a mechanism. In cases of redstone torch it will propagate on the next tick
-    //  // println!("called {:?}", from_port);
-    //  // println!("should {x} {y} {:?} {:?}", prev_signal_type, from_port);
     if let Some(from_port) = from_port {
         if !input_ports[from_port.to_port_idx()] {
-            //  // println!("port idx problem at {x} {y}");
             return;
         }
-        //  // println!("kind {:?}", kind);
+
         match kind {
             Some(RedstoneKind::Dust) => {
-                //  // println!("prev signal type {:?}", prev_signal_type);
-                // this doesn't return and will continue
-                //  // println!("{:?}", prev_signal_type);
                 if let Some(SignalType::Weak(false)) = prev_signal_type {
-                    //  // println!("returned weak");
                     return;
                 } else if let None = prev_signal_type {
-                    //  // println!("returned none");
                     return;
                 }
-
-                //  // println!("strong true or false");
             }
             Some(RedstoneKind::Mechanism) => {
                 if input_signal > 0 {
-                    //  // println!("turning on");
                     listeners.turn_mechanism_on(x, y);
                 } else {
-                    //  // println!("turning off");
                     listeners.turn_mechanism_off(x, y);
                 }
             }
             None => {
                 match prev_signal_type {
                     Some(SignalType::Weak(false)) | Some(SignalType::Strong(false)) => {
-                        // println!("false gods");
                         return;
                     }
-                    _ => {
-                        // println!("{:?} {input_signal} {previous_signal}", prev_signal_type);
-                    }
+                    _ => {}
                 }
             }
             _ => {
@@ -98,31 +76,27 @@ pub fn propagate_signal_at(
     }
 
     *calculations += 1;
-    // println!("on step {calculations}");
+
     if *calculations > 10000 {
         propagation_queue.append(x, y, input_signal, from_port, previous_signal, prev_signal_type);
-        return
+        return;
     }
     //input signal > current signal -> turning on
-    // previous signal > current signal -> can be either turning on or off
-    //  // println!("input {input_signal} sig {}", *signal);
+
     if
         input_signal >= *signal ||
         (previous_signal == *signal + 1 && *signal > 0 && input_signal == 0)
     {
-        //  // println!("bare minimum");
         if let Some(_) = from_port {
             if input_signal == *signal && input_signal > 0 {
                 return;
             }
         }
-        //  // println!("first");
+
         let output_signal_type = match *signal_type {
             Some(curr_signal_type) => {
-                // redstone sources can only have their signal set externally
                 if let SignalType::Strong(true) = curr_signal_type {
                     if let Some(_) = from_port {
-                        //  // println!("returned");
                         return;
                     }
                 }
@@ -141,7 +115,6 @@ pub fn propagate_signal_at(
             None => {
                 match prev_signal_type {
                     Some(SignalType::Strong(true)) => {
-                        //  // println!("strong true");
                         if input_signal > 0 {
                             *signal_type = Some(SignalType::Strong(false));
                         }
@@ -156,16 +129,11 @@ pub fn propagate_signal_at(
                         SignalType::Weak(false)
                     }
                     _ => {
-                        //  // println!("also returned");
                         return;
                     }
                 }
             }
         };
-        //  // println!("output type {:?} {input_signal} {previous_signal} {}", output_signal_type, *signal);
-        // the equality is only valid for cases where the entity is lit up by the system
-        // The cases are when a mechanism can propagate siganl and is lit up by external circumstances
-        // None in from_port means that the entity is lighting itself up
 
         let current_signal = *signal;
         *signal = input_signal;
@@ -182,8 +150,7 @@ pub fn propagate_signal_at(
                 if let Some(signal_type) = port_signal_type {
                     port_output_signal_type = signal_type;
                 }
-                // println!("{:?}", port_output_signal_type);
-                //  // println!("prop {transmitted_signal}");
+
                 propagate_signal_at(
                     chunks,
                     next_x,
@@ -201,9 +168,8 @@ pub fn propagate_signal_at(
     }
 
     if input_signal == 0 {
-        // println!("repropogate");
         let prev_redstone = get_max_prev(chunks, x, y);
-        //  // println!("back {:?}", prev_redstone);
+
         let (from_port, previous_signal, prev_signal_type) = prev_redstone;
         let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
         propagate_signal_at(
@@ -237,7 +203,6 @@ pub fn get_max_prev(
         Some(Block { redstone: Some(Redstone { signal, input_ports, signal_type, .. }), .. }) =>
             (*signal, input_ports.clone(), *signal_type),
         _ => {
-            //  // println!("why the fuck");
             return (None, 0, None);
         }
     };
@@ -247,8 +212,6 @@ pub fn get_max_prev(
     let mut max_signal_type = signal_type;
 
     for (idx, port) in input_ports.iter().enumerate() {
-        //  // println!("{}", *port);
-
         if *port {
             let port_orientation = Orientation::port_idx_to_orientation(idx);
             let (next_x, next_y) = port_orientation.get_next_coord(x, y);
@@ -271,7 +234,6 @@ pub fn get_max_prev(
                     ),
                 ) = next_blk
             {
-                //  // println!("comp {} {max_signal}", *signal);
                 if
                     output_ports[port_orientation.get_opposing().to_port_idx()] &&
                     (*signal > max_signal || (max_signal_loc == None && *signal > 0))
@@ -377,8 +339,7 @@ pub fn update_dust_ports(
         let (next_x, next_y) = orientation.get_next_coord(x, y);
         let signal = redstone_dust.signal;
         let signal_type = redstone_dust.signal_type;
-        // println!("{signal} {:?}", signal_type);
-        // println!("changed {signal} {:?}", signal_type);
+
         propagate_signal_at(
             chunks,
             next_x,
@@ -416,7 +377,6 @@ pub fn update_dust_ports(
     }
 
     if changed {
-        // println!("changed");
         let redstone = get_redstone_dust(chunks, x, y);
         let dust = if let Some(rs) = redstone {
             rs
@@ -437,7 +397,7 @@ pub fn update_dust_ports(
             calculations
         );
         let prev_redstone = get_max_prev(chunks, x, y);
-        //  // println!("back {:?}", prev_redstone);
+
         let (from_port, previous_signal, prev_signal_type) = prev_redstone;
         let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
         propagate_signal_at(
