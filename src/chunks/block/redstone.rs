@@ -10,9 +10,10 @@ pub fn propagate_signal_at(
     prev_signal_type: Option<SignalType>,
     listeners: &mut EventListeners,
     propagation_queue: &mut PropagationQueue,
-    calculations: &mut u32
+    calculations: &mut u32,
+    repropagation_queue: &mut RepropagationQueue
 ) {
-    if input_signal <= 0 && previous_signal <= 1 {
+    if (input_signal <= 0 && previous_signal <= 1) || input_signal == 1 {
         return;
     }
 
@@ -76,12 +77,10 @@ pub fn propagate_signal_at(
     }
 
     *calculations += 1;
-
     if *calculations > 10000 {
         propagation_queue.append(x, y, input_signal, from_port, previous_signal, prev_signal_type);
         return;
     }
-    //input signal > current signal -> turning on
 
     if
         input_signal >= *signal ||
@@ -161,29 +160,13 @@ pub fn propagate_signal_at(
                     Some(port_output_signal_type),
                     listeners,
                     propagation_queue,
-                    calculations
+                    calculations,
+                    repropagation_queue
                 );
             }
         }
-    }
-
-    if input_signal == 0 {
-        let prev_redstone = get_max_prev(chunks, x, y);
-
-        let (from_port, previous_signal, prev_signal_type) = prev_redstone;
-        let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
-        propagate_signal_at(
-            chunks,
-            x,
-            y,
-            from_port,
-            transmitted_signal,
-            previous_signal,
-            prev_signal_type,
-            listeners,
-            propagation_queue,
-            calculations
-        );
+    } else if input_signal == 0 {
+        repropagation_queue.append(x, y);
     }
 }
 
@@ -308,7 +291,8 @@ pub fn update_dust_ports(
     y: i128,
     listeners: &mut EventListeners,
     propagation_queue: &mut PropagationQueue,
-    calculations: &mut u32
+    calculations: &mut u32,
+    repropagation_queue: &mut RepropagationQueue
 ) {
     let mut last_orientation = Orientation::Up;
     let mut count = 0;
@@ -350,7 +334,8 @@ pub fn update_dust_ports(
             signal_type,
             listeners,
             propagation_queue,
-            calculations
+            calculations,
+            repropagation_queue
         );
     }
 
@@ -394,7 +379,8 @@ pub fn update_dust_ports(
             None,
             listeners,
             propagation_queue,
-            calculations
+            calculations,
+            repropagation_queue
         );
         let prev_redstone = get_max_prev(chunks, x, y);
 
@@ -410,7 +396,8 @@ pub fn update_dust_ports(
             prev_signal_type,
             listeners,
             propagation_queue,
-            calculations
+            calculations,
+            repropagation_queue
         );
     }
 }

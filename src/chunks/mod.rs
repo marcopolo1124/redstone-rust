@@ -139,12 +139,15 @@ pub fn place(
     image_assets: &ImageAssets,
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     propagation_queue: &mut PropagationQueue,
-    calculations: &mut u32
+    calculations: &mut u32,
+    repropagation_queue: &mut RepropagationQueue
 ) -> bool {
     let curr = chunks.get_block(x, y);
     if let Some(_) = curr {
         return false;
     }
+
+    *calculations = 0;
 
     if blk.symmetric {
         orientation = Orientation::Up;
@@ -170,7 +173,7 @@ pub fn place(
     if let Some(rs) = redstone {
         match rs.signal_type {
             Some(SignalType::Strong(true) | SignalType::Weak(true)) => {
-                update_dust_ports(chunks, x, y, listeners, propagation_queue, calculations);
+                update_dust_ports(chunks, x, y, listeners, propagation_queue, calculations, repropagation_queue);
 
                 for orientation in Orientation::iter() {
                     let (next_x, next_y) = orientation.get_next_coord(x, y);
@@ -180,7 +183,8 @@ pub fn place(
                         next_y,
                         listeners,
                         propagation_queue,
-                        calculations
+                        calculations,
+                        repropagation_queue
                     );
                     update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
                 }
@@ -202,7 +206,8 @@ pub fn place(
             prev_signal_type,
             listeners,
             propagation_queue,
-            calculations
+            calculations,
+            repropagation_queue
         );
     }
 
@@ -220,9 +225,11 @@ pub fn destroy(
     image_assets: &ImageAssets,
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     propagation_queue: &mut PropagationQueue,
-    calculations: &mut u32
+    calculations: &mut u32,
+    repropagation_queue: &mut RepropagationQueue
 ) -> bool {
     let curr_blk = chunks.get_maybe_block(x, y);
+    *calculations = 0;
     if let Some(mutref) = curr_blk {
         if
             let Some(
@@ -250,7 +257,8 @@ pub fn destroy(
                         curr_signal_type,
                         listeners,
                         propagation_queue,
-                        calculations
+                        calculations,
+                        repropagation_queue
                     );
                 }
             }
@@ -267,7 +275,8 @@ pub fn destroy(
                         next_y,
                         listeners,
                         propagation_queue,
-                        calculations
+                        calculations,
+                        repropagation_queue
                     );
                     update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
                 }
