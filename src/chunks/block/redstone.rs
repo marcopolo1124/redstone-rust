@@ -163,7 +163,8 @@ pub fn propagate_signal_at(
                 );
             }
         }
-    } else if input_signal == 0 {
+    } else if input_signal == 0 && *signal > previous_signal{
+        listeners.repropagate(x, y)
     }
 }
 

@@ -24,6 +24,7 @@ const BOX_WIDTH: f32 = 48.0;
 pub struct EventListeners {
     pub entity_map_update: HashSet<(i128, i128)>,
     pub mechanism_listener: HashMap<(i128, i128), bool>,
+    pub repropagation_listener: HashSet<(i128, i128)>,
 }
 
 impl EventListeners {
@@ -31,6 +32,7 @@ impl EventListeners {
         EventListeners {
             entity_map_update: HashSet::new(),
             mechanism_listener: HashMap::new(),
+            repropagation_listener: HashSet::new(),
         }
     }
 
@@ -47,6 +49,10 @@ impl EventListeners {
     }
     pub fn remove_mechanism(&mut self, x: i128, y: i128) {
         self.mechanism_listener.remove(&(x, y));
+    }
+
+    pub fn repropagate(&mut self, x: i128, y: i128) {
+        self.repropagation_listener.insert((x, y));
     }
 }
 
@@ -68,23 +74,6 @@ struct SaveData(
 struct AutosaveTimer {
     timer: Timer,
 }
-
-// let prev_redstone = get_max_prev(chunks, x, y);
-// let (from_port, previous_signal, prev_signal_type) = prev_redstone;
-// let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
-// propagate_signal_at(
-//     chunks,
-//     x,
-//     y,
-//     from_port,
-//     transmitted_signal,
-//     previous_signal,
-//     prev_signal_type,
-//     listeners,
-//     propagation_queue,
-//     calculations,
-//     self
-// );
 
 #[derive(Clone, Debug)]
 struct PropagationArgs {
@@ -139,7 +128,7 @@ impl PropagationQueue {
                 job.prev_signal_type,
                 listeners,
                 self,
-                calculations,
+                calculations
             );
         }
     }
@@ -191,6 +180,7 @@ fn main() {
         )
         .add_systems(OnEnter(MyStates::InGame), init)
         .add_systems(FixedUpdate, mechanism_listener.run_if(in_state(MyStates::InGame)))
+        .add_systems(Update, repropagation_listener.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, mouse_input.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, update_selected_block.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, update_entity_listener.run_if(in_state(MyStates::InGame)))
@@ -213,12 +203,7 @@ fn execute_listeners(
         return;
     }
 
-    propagation_queue.execute_queue(
-        &mut chunks,
-        &mut listeners,
-        &mut calculations.0
-    );
-
+    propagation_queue.execute_queue(&mut chunks, &mut listeners, &mut calculations.0);
 }
 
 const DIRT: Block = Block {
@@ -421,7 +406,7 @@ fn init(
                         &image_assets,
                         &mut query,
                         &mut propagation_queue,
-                        &mut calculations.0,
+                        &mut calculations.0
                     );
                 }
             }
@@ -497,7 +482,7 @@ pub fn mouse_input(
     image_assets: Res<ImageAssets>,
     mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     mut propagation_queue: ResMut<PropagationQueue>,
-    mut calculations: ResMut<Calculations>,
+    mut calculations: ResMut<Calculations>
 ) {
     let (camera, camera_transform) = q_camera.single();
     let (x, y) = if
@@ -526,7 +511,7 @@ pub fn mouse_input(
                     &image_assets,
                     &mut query,
                     &mut propagation_queue,
-                    &mut calculations.0,
+                    &mut calculations.0
                 )
             {
                 interact(chunks.as_mut(), x, y, &mut commands, &image_assets, &mut query);
@@ -542,7 +527,7 @@ pub fn mouse_input(
             &image_assets,
             &mut query,
             &mut propagation_queue,
-            &mut calculations.0,
+            &mut calculations.0
         );
     }
 }
@@ -719,7 +704,7 @@ fn mechanism_listener(
     image_assets: Res<ImageAssets>,
     mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     mut propagation_queue: ResMut<PropagationQueue>,
-    mut calculations: ResMut<Calculations>,
+    mut calculations: ResMut<Calculations>
 ) {
     if !propagation_queue.is_empty() {
         return;
@@ -741,6 +726,34 @@ fn mechanism_listener(
             &mut commands,
             &image_assets,
             &mut query,
+            &mut propagation_queue,
+            &mut calculations.0
+        );
+    }
+}
+
+fn repropagation_listener(
+    mut listeners: ResMut<EventListeners>,
+    mut chunks: ResMut<Chunks>,
+    mut propagation_queue: ResMut<PropagationQueue>,
+    mut calculations: ResMut<Calculations>
+) {
+    let queue = listeners.repropagation_listener.clone();
+    listeners.repropagation_listener.clear();
+
+    for (x, y) in queue {
+        let prev_redstone = get_max_prev(&mut chunks, x, y);
+        let (from_port, previous_signal, prev_signal_type) = prev_redstone;
+        let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
+        propagate_signal_at(
+            &mut chunks,
+            x,
+            y,
+            from_port,
+            transmitted_signal,
+            previous_signal,
+            prev_signal_type,
+            &mut listeners,
             &mut propagation_queue,
             &mut calculations.0,
         );
