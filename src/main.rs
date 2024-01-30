@@ -223,6 +223,24 @@ fn main() {
 
 const DIRT: Block = Block {
     movable: true,
+    sticky: false,
+    orientation: Orientation::Up,
+    texture_name: TextureName::Dirt,
+    symmetric: true,
+    redstone: Some(Redstone {
+        signal: 0,
+        signal_type: None,
+        kind: None,
+        signal_type_port_mapping: [None, None, None, None],
+        input_ports: [true, true, true, true],
+        output_ports: [true, true, true, true],
+    }),
+    mechanism: None,
+};
+
+const SLIME: Block = Block {
+    movable: true,
+    sticky: true,
     orientation: Orientation::Up,
     texture_name: TextureName::Dirt,
     symmetric: true,
@@ -239,6 +257,7 @@ const DIRT: Block = Block {
 
 const REDSTONE_TORCH: Block = Block {
     movable: false,
+    sticky: false,
     orientation: Orientation::Up,
     texture_name: TextureName::RedstoneTorch,
     symmetric: false,
@@ -260,6 +279,7 @@ const REDSTONE_TORCH: Block = Block {
 
 const REPEATER: Block = Block {
     movable: false,
+    sticky: false,
     orientation: Orientation::Up,
     texture_name: TextureName::Repeater,
     symmetric: false,
@@ -276,6 +296,7 @@ const REPEATER: Block = Block {
 
 const OBSERVER: Block = Block {
     movable: false,
+    sticky: false,
     orientation: Orientation::Up,
     texture_name: TextureName::Observer,
     symmetric: false,
@@ -292,6 +313,7 @@ const OBSERVER: Block = Block {
 
 const REDSTONE_DUST: Block = Block {
     movable: false,
+    sticky: false,
     orientation: Orientation::Up,
     texture_name: TextureName::RedstoneDust,
     symmetric: true,
@@ -313,6 +335,7 @@ const REDSTONE_DUST: Block = Block {
 
 const PISTON: Block = Block {
     movable: true,
+    sticky: false,
     orientation: Orientation::Up,
     texture_name: TextureName::Piston,
     symmetric: false,
@@ -329,6 +352,7 @@ const PISTON: Block = Block {
 
 const PISTON_HEAD: Block = Block {
     movable: false,
+    sticky: false,
     orientation: Orientation::Up,
     texture_name: TextureName::PistonHead,
     symmetric: false,
@@ -338,6 +362,7 @@ const PISTON_HEAD: Block = Block {
 
 const STICKY_PISTON: Block = Block {
     movable: true,
+    sticky: false,
     orientation: Orientation::Up,
     texture_name: TextureName::StickyPiston,
     symmetric: false,
@@ -354,6 +379,7 @@ const STICKY_PISTON: Block = Block {
 
 const STICKY_PISTON_HEAD: Block = Block {
     movable: false,
+    sticky: false,
     orientation: Orientation::Up,
     texture_name: TextureName::StickyPistonHead,
     symmetric: false,
@@ -484,6 +510,8 @@ pub fn update_selected_block(
         selected.0 = Some(REPEATER);
     } else if keyboard_input.pressed(KeyCode::Key7) {
         selected.0 = Some(OBSERVER);
+    } else if keyboard_input.pressed(KeyCode::Key8) {
+        selected.0 = Some(SLIME);
     }
 }
 

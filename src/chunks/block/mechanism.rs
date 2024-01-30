@@ -12,6 +12,18 @@ fn get_extended(chunks: &mut Chunks, x: i128, y: i128) -> Option<&mut bool> {
     }
 }
 
+fn get_movable(chunks: &mut Chunks, x: i128, y: i128) -> Option<&mut bool> {
+    let blk = chunks.get_block(x, y);
+    if
+        let Some(Block {movable, .. }) =
+            blk
+    {
+        Some(movable)
+    } else {
+        None
+    }
+}
+
 pub fn execute_mechanism(
     chunks: &mut Chunks,
     x: i128,
@@ -22,7 +34,7 @@ pub fn execute_mechanism(
     image_assets: &ImageAssets,
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     propagation_queue: &mut PropagationQueue,
-    calculations: &mut u32,
+    calculations: &mut u32
 ) {
     let maybe_blk = chunks.get_block(x, y);
     let blk = if let Some(blk) = maybe_blk {
@@ -31,7 +43,7 @@ pub fn execute_mechanism(
         return;
     };
 
-    let Block { orientation, mechanism, redstone, .. } = blk;
+    let Block { orientation, mechanism, redstone, movable, .. } = blk;
     let mechanism_kind = if let Some(mechanism_kind) = mechanism {
         mechanism_kind
     } else {
@@ -59,7 +71,7 @@ pub fn execute_mechanism(
                     None,
                     listeners,
                     propagation_queue,
-                    calculations,
+                    calculations
                 )
             } else if !on && signal <= 0 {
                 propagate_signal_at(
@@ -72,13 +84,15 @@ pub fn execute_mechanism(
                     None,
                     listeners,
                     propagation_queue,
-                    calculations,
+                    calculations
                 )
             }
         }
         MechanismKind::Piston { ref mut extended, sticky } => {
             let is_sticky = *sticky;
             let piston_head = if is_sticky { STICKY_PISTON_HEAD } else { PISTON_HEAD };
+            let mut traversed = HashSet::new();
+            *movable = false;
             if !*extended && on {
                 let (next_x, next_y) = orientation.get_next_coord(x, y);
                 let moved = move_blocks(
@@ -86,6 +100,7 @@ pub fn execute_mechanism(
                     next_x,
                     next_y,
                     orientation,
+                    HashSet::new(),
                     20,
                     listeners,
                     &mut commands,
@@ -93,6 +108,7 @@ pub fn execute_mechanism(
                     query,
                     propagation_queue,
                     calculations,
+                    &mut traversed
                 );
                 if moved {
                     if let Some(extended) = get_extended(chunks, x, y) {
@@ -109,17 +125,22 @@ pub fn execute_mechanism(
                         &image_assets,
                         query,
                         propagation_queue,
-                        calculations,
+                        calculations
                     );
                     listeners.update_entity(x, y);
                 } else {
-                    listeners.turn_mechanism_on(x, y)
+                    if let Some(movable) = get_movable(chunks, x, y) {
+                        *movable = true;
+                    }
+                    listeners.turn_mechanism_on(x, y);
                 }
             } else if *extended && !on {
                 *extended = false;
+                
                 listeners.update_entity(x, y);
                 let (next_x, next_y) = orientation.get_next_coord(x, y);
                 let next_block = chunks.get_block(next_x, next_y);
+
                 if let Some(blk) = next_block {
                     if blk.texture_name == piston_head.texture_name {
                         destroy(
@@ -131,7 +152,7 @@ pub fn execute_mechanism(
                             &image_assets,
                             query,
                             propagation_queue,
-                            calculations,
+                            calculations
                         );
                     }
                 }
@@ -143,6 +164,7 @@ pub fn execute_mechanism(
                         next_next_x,
                         next_next_y,
                         pull_dir,
+                        HashSet::new(),
                         20,
                         listeners,
                         &mut commands,
@@ -150,7 +172,11 @@ pub fn execute_mechanism(
                         query,
                         propagation_queue,
                         calculations,
+                        &mut traversed
                     );
+                }
+                if let Some(movable) = get_movable(chunks, x, y) {
+                    *movable = true;
                 }
             }
         }
@@ -187,7 +213,7 @@ pub fn execute_mechanism(
                         None,
                         listeners,
                         propagation_queue,
-                        calculations,
+                        calculations
                     );
                     if !on {
                         listeners.turn_mechanism_off(x, y)
@@ -203,16 +229,16 @@ pub fn execute_mechanism(
                         None,
                         listeners,
                         propagation_queue,
-                        calculations,
+                        calculations
                     );
                     if on {
                         listeners.turn_mechanism_on(x, y)
                     }
                 }
             }
-        },
+        }
         MechanismKind::Observer => {
-            if on{
+            if on {
                 propagate_signal_at(
                     chunks,
                     x,
@@ -223,11 +249,11 @@ pub fn execute_mechanism(
                     None,
                     listeners,
                     propagation_queue,
-                    calculations,
+                    calculations
                 );
 
                 listeners.turn_mechanism_off(x, y);
-            } else{
+            } else {
                 propagate_signal_at(
                     chunks,
                     x,
@@ -238,7 +264,7 @@ pub fn execute_mechanism(
                     None,
                     listeners,
                     propagation_queue,
-                    calculations,
+                    calculations
                 );
             }
         }
@@ -250,6 +276,7 @@ fn move_blocks(
     x: i128,
     y: i128,
     orientation: Orientation,
+    from: HashSet<Orientation>,
     strength: usize,
     listeners: &mut EventListeners,
     mut commands: &mut Commands,
@@ -257,6 +284,7 @@ fn move_blocks(
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     propagation_queue: &mut PropagationQueue,
     calculations: &mut u32,
+    traversed: &mut HashSet<(i128, i128)>
 ) -> bool {
     if strength <= 0 {
         return false;
@@ -273,12 +301,21 @@ fn move_blocks(
         return true;
     };
 
+    if traversed.contains(&(x, y)) {
+        return false;
+    }
+    traversed.insert((x, y));
+
+    let mut restricted = from.clone();
+    restricted.insert(orientation.get_opposing());
+
     let (next_x, next_y) = orientation.get_next_coord(x, y);
     let moved = move_blocks(
         chunks,
         next_x,
         next_y,
         orientation,
+        restricted,
         strength - 1,
         listeners,
         &mut commands,
@@ -286,7 +323,9 @@ fn move_blocks(
         query,
         propagation_queue,
         calculations,
+        traversed
     );
+
     if moved {
         if
             let Block { redstone: Some(Redstone { ref mut signal, ref mut signal_type, .. }), .. } =
@@ -312,8 +351,9 @@ fn move_blocks(
             &image_assets,
             query,
             propagation_queue,
-            calculations,
+            calculations
         );
+
         destroy(
             chunks,
             x,
@@ -323,9 +363,38 @@ fn move_blocks(
             &image_assets,
             query,
             propagation_queue,
-            calculations,
+            calculations
         );
         listeners.update_entity(x, y);
+
+        if blk.sticky {
+
+
+            for neighbor_orientation in Orientation::iter() {
+                let (next_x, next_y) = neighbor_orientation.get_next_coord(x, y);
+                if neighbor_orientation != orientation && !from.contains(&neighbor_orientation){
+
+                    let mut restricted = from.clone();
+                    restricted.insert(neighbor_orientation.get_opposing());
+                    move_blocks(
+                        chunks,
+                        next_x,
+                        next_y,
+                        orientation,
+                        restricted,
+                        strength - 1,
+                        listeners,
+                        &mut commands,
+                        &image_assets,
+                        query,
+                        propagation_queue,
+                        calculations,
+                        traversed
+                    );
+                }
+
+            }
+        }
     }
 
     moved

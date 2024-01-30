@@ -7,6 +7,7 @@ pub use mechanism::*;
 #[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub struct Block {
     pub movable: bool,
+    pub sticky: bool,
     pub orientation: Orientation,
     pub texture_name: TextureName,
     pub symmetric: bool,
@@ -51,7 +52,7 @@ pub enum SignalType {
     Weak(bool),
 }
 
-#[derive(Debug, PartialEq, Copy, Clone, Resource, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Copy, Clone, Resource, Serialize, Deserialize, Hash, Eq)]
 pub enum Orientation {
     Up,
     Right,
