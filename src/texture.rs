@@ -9,6 +9,11 @@ pub struct ImageAssets {
     #[asset(image(sampler = nearest))]
     redstone_torch: Handle<TextureAtlas>,
 
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 2, rows = 1))]
+    #[asset(path = "images/observer.png")]
+    #[asset(image(sampler = nearest))]
+    observer: Handle<TextureAtlas>,
+
     #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 1, rows = 1))]
     #[asset(path = "images/dirt.png")]
     #[asset(image(sampler = nearest))]
@@ -61,6 +66,7 @@ pub fn get_atlas(texture_name: TextureName, image_assets: &ImageAssets) -> Handl
         TextureName::PistonHead => image_assets.piston_head.clone(),
         TextureName::StickyPistonHead => image_assets.sticky_piston_head.clone(),
         TextureName::Repeater => image_assets.repeater.clone(),
+        TextureName::Observer => image_assets.observer.clone()
     }
 }
 
@@ -75,4 +81,5 @@ pub enum TextureName {
     PistonHead,
     StickyPistonHead,
     Repeater,
+    Observer
 }

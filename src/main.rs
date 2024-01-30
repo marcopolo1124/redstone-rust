@@ -59,6 +59,21 @@ impl EventListeners {
     pub fn repropagate(&mut self, x: i128, y: i128) {
         self.repropagation_listener.insert((x, y));
     }
+
+    pub fn change_state(&mut self, x: i128, y: i128, from_port: Orientation, chunks: &Chunks) {
+        let blk = chunks.get_block_ref(x, y);
+        let orientation = if
+            let Some(Block { mechanism: Some(MechanismKind::Observer), orientation, .. }) = blk
+        {
+            orientation
+        } else {
+            return;
+        };
+
+        if from_port == orientation.get_opposing() {
+            self.turn_mechanism_on(x, y)
+        }
+    }
 }
 
 #[derive(Resource, PartialEq)]
@@ -259,6 +274,22 @@ const REPEATER: Block = Block {
     mechanism: Some(MechanismKind::Repeater { countdown: -1, tick: 0 }),
 };
 
+const OBSERVER: Block = Block {
+    movable: false,
+    orientation: Orientation::Up,
+    texture_name: TextureName::Observer,
+    symmetric: false,
+    redstone: Some(Redstone {
+        signal: 0,
+        signal_type_port_mapping: [Some(SignalType::Strong(true)), None, None, None],
+        signal_type: Some(SignalType::Strong(true)),
+        kind: Some(RedstoneKind::Mechanism),
+        input_ports: [false, false, false, false],
+        output_ports: [true, false, false, false],
+    }),
+    mechanism: Some(MechanismKind::Observer),
+};
+
 const REDSTONE_DUST: Block = Block {
     movable: false,
     orientation: Orientation::Up,
@@ -451,6 +482,8 @@ pub fn update_selected_block(
         selected.0 = Some(STICKY_PISTON);
     } else if keyboard_input.pressed(KeyCode::Key6) {
         selected.0 = Some(REPEATER);
+    } else if keyboard_input.pressed(KeyCode::Key7) {
+        selected.0 = Some(OBSERVER);
     }
 }
 
@@ -583,7 +616,7 @@ pub fn mouse_input(
                         &mut calculations
                     )
                 {
-                    interact(chunks.as_mut(), x, y, &mut commands, &image_assets, &mut query);
+                    interact(chunks.as_mut(), x, y, &mut commands, &image_assets, &mut query, &mut listeners);
                 }
             }
         }
@@ -657,6 +690,13 @@ fn get_state(blk: Block) -> usize {
             let col_ind = if signal > 0 { 1 } else { 0 };
             let row_ind = tick * 2;
             (row_ind + col_ind) as usize
+        }
+        Block {
+            redstone: Some(Redstone { signal, .. }),
+            mechanism: Some(MechanismKind::Observer),
+            ..
+        } => {
+            if signal > 0 { 1 } else { 0 }
         }
         _ => 0,
     }
@@ -796,9 +836,6 @@ fn execute_listeners(
         return;
     }
 
-    let calc = &mut calculations;
-    *calc = 0;
-
     let mechanism_listener = listeners.mechanism_listener.clone();
     listeners.mechanism_listener.clear();
 
@@ -817,8 +854,11 @@ fn execute_listeners(
         );
     }
 
-    for (x, y) in &listeners.entity_map_update {
-        update_entity(&mut commands, &mut chunks, *x, *y, &image_assets, &mut query);
+    let entity_map_update = listeners.entity_map_update.clone();
+
+    for (x, y) in entity_map_update{
+        update_entity(&mut commands, &mut chunks, x, y, &image_assets, &mut query);
+        alert_neighbours(x, y, &chunks, &mut listeners);
     }
     listeners.entity_map_update.clear();
     updates_timer.number_of_updates += 1;
@@ -830,7 +870,8 @@ fn interact(
     y: i128,
     commands: &mut Commands,
     image_assets: &ImageAssets,
-    query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>
+    query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>,
+    listeners: &mut EventListeners
 ) {
     let blk = chunks.get_block(x, y);
     match blk {
@@ -839,7 +880,8 @@ fn interact(
         }
         _ => {}
     }
-    update_entity(commands, chunks, x, y, image_assets, query)
+    update_entity(commands, chunks, x, y, image_assets, query);
+    alert_neighbours(x, y, &chunks, listeners);
 }
 
 fn autosave(
@@ -903,5 +945,12 @@ pub fn zoom_camera(
         } else {
             transform.scale = 0.0;
         }
+    }
+}
+
+pub fn alert_neighbours(x: i128, y: i128, chunks: &Chunks, listeners: &mut EventListeners){
+    for orientation in Orientation::iter() {
+        let (next_x, next_y) = orientation.get_next_coord(x, y);
+        listeners.change_state(next_x, next_y, orientation.get_opposing(), &chunks);
     }
 }

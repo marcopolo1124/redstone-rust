@@ -185,6 +185,7 @@ pub fn place(
                         calculations,
                     );
                     update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
+                    alert_neighbours(x, y, &chunks, listeners);
                 }
             }
             _ => {}
@@ -209,6 +210,7 @@ pub fn place(
     }
 
     update_entity(commands, &mut chunks, x, y, image_assets, query);
+    alert_neighbours(x, y, &chunks, listeners);
 
     return true;
 }
@@ -237,6 +239,7 @@ pub fn destroy(
             let curr_output_ports = *output_ports;
             *mutref = None;
             update_entity(commands, &mut chunks, x, y, image_assets, query);
+            alert_neighbours(x, y, &chunks, listeners);
 
             for (idx, port) in curr_output_ports.iter().enumerate() {
                 if *port {
@@ -273,11 +276,13 @@ pub fn destroy(
                         calculations,
                     );
                     update_entity(commands, &mut chunks, next_x, next_y, image_assets, query);
+                    alert_neighbours(x, y, &chunks, listeners);
                 }
             }
         } else {
             *mutref = None;
             update_entity(commands, &mut chunks, x, y, image_assets, query);
+            alert_neighbours(x, y, &chunks, listeners);
         }
     }
 

@@ -35,6 +35,7 @@ pub enum MechanismKind {
         extended: bool,
         sticky: bool,
     },
+    Observer
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
