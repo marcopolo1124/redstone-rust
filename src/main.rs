@@ -188,32 +188,19 @@ fn main() {
         .add_systems(Update, (fps_text_update_system, fps_counter_showhide))
         .add_systems(OnEnter(MyStates::InGame), init)
         .add_systems(Update, mouse_pos_update_system.run_if(in_state(MyStates::InGame)))
-        .add_systems(FixedUpdate, mechanism_listener.run_if(in_state(MyStates::InGame)))
-        .add_systems(Update, repropagation_listener.run_if(in_state(MyStates::InGame)))
+        .add_systems(FixedUpdate, execute_listeners.run_if(in_state(MyStates::InGame)))
+        // .add_systems(Update, repropagation_listener.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, mouse_input.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, update_selected_block.run_if(in_state(MyStates::InGame)))
-        .add_systems(Update, update_entity_listener.run_if(in_state(MyStates::InGame)))
+        // .add_systems(Update, update_entity_listener.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, move_camera.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, update_orientation.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, autosave.run_if(in_state(MyStates::InGame)))
-        .add_systems(Update, execute_listeners.run_if(in_state(MyStates::InGame)))
+        // .add_systems(Update, execute_listeners.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, zoom_camera.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, update_tick)
         .add_systems(Update, update_cursor_position.run_if(in_state(MyStates::InGame)))
         .run()
-}
-
-fn execute_listeners(
-    mut listeners: ResMut<EventListeners>,
-    mut chunks: ResMut<Chunks>,
-    mut propagation_queue: ResMut<PropagationQueue>,
-    mut calculations: ResMut<Calculations>
-) {
-    if propagation_queue.is_empty() {
-        return;
-    }
-
-    propagation_queue.execute_queue(&mut chunks, &mut listeners, &mut calculations.0);
 }
 
 const DIRT: Block = Block {
@@ -611,27 +598,6 @@ fn get_mouse_coord(x: f32, y: f32) -> (i128, i128, f32, f32) {
     (x_coord_raw.floor() as i128, y_coord_raw.floor() as i128, x_dist, y_dist)
 }
 
-fn update_entity_listener(
-    mut commands: Commands,
-    mut listeners: ResMut<EventListeners>,
-    propagation_queue: ResMut<PropagationQueue>,
-    image_assets: Res<ImageAssets>,
-    mut chunks: ResMut<Chunks>,
-    mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>
-) {
-    if !propagation_queue.is_empty() {
-        return;
-    }
-
-    if listeners.repropagation_listener.len() > 0 {
-        return;
-    }
-    for (x, y) in &listeners.entity_map_update {
-        update_entity(&mut commands, &mut chunks, *x, *y, &image_assets, &mut query);
-    }
-    listeners.entity_map_update.clear();
-}
-
 fn get_connection(ports: &[bool; 4]) -> usize {
     match *ports {
         [true, true, true, true] => 10,
@@ -774,7 +740,7 @@ enum MyStates {
     InGame,
 }
 
-fn mechanism_listener(
+fn execute_listeners(
     mut listeners: ResMut<EventListeners>,
     mut chunks: ResMut<Chunks>,
     mut commands: Commands,
@@ -783,8 +749,32 @@ fn mechanism_listener(
     mut propagation_queue: ResMut<PropagationQueue>,
     mut calculations: ResMut<Calculations>
 ) {
+
+    propagation_queue.execute_queue(&mut chunks, &mut listeners, &mut calculations.0);
+
     if !propagation_queue.is_empty() {
         return;
+    }
+
+    let queue = listeners.repropagation_listener.clone();
+    listeners.repropagation_listener.clear();
+
+    for (x, y) in queue {
+        let prev_redstone = get_max_prev(&mut chunks, x, y);
+        let (from_port, previous_signal, prev_signal_type) = prev_redstone;
+        let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
+        propagate_signal_at(
+            &mut chunks,
+            x,
+            y,
+            from_port,
+            transmitted_signal,
+            previous_signal,
+            prev_signal_type,
+            &mut listeners,
+            &mut propagation_queue,
+            &mut calculations.0
+        );
     }
 
     if listeners.repropagation_listener.len() > 0 {
@@ -811,38 +801,11 @@ fn mechanism_listener(
             &mut calculations.0
         );
     }
-}
 
-fn repropagation_listener(
-    mut listeners: ResMut<EventListeners>,
-    mut chunks: ResMut<Chunks>,
-    mut propagation_queue: ResMut<PropagationQueue>,
-    mut calculations: ResMut<Calculations>
-) {
-
-    if !propagation_queue.is_empty(){
-        return;
+    for (x, y) in &listeners.entity_map_update {
+        update_entity(&mut commands, &mut chunks, *x, *y, &image_assets, &mut query);
     }
-    let queue = listeners.repropagation_listener.clone();
-    listeners.repropagation_listener.clear();
-
-    for (x, y) in queue {
-        let prev_redstone = get_max_prev(&mut chunks, x, y);
-        let (from_port, previous_signal, prev_signal_type) = prev_redstone;
-        let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
-        propagate_signal_at(
-            &mut chunks,
-            x,
-            y,
-            from_port,
-            transmitted_signal,
-            previous_signal,
-            prev_signal_type,
-            &mut listeners,
-            &mut propagation_queue,
-            &mut calculations.0
-        );
-    }
+    listeners.entity_map_update.clear();
 }
 
 fn interact(
