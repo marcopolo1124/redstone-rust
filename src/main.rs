@@ -2,6 +2,8 @@ mod chunks;
 use std::{ f32::consts::PI, path::Path };
 use std::time::Duration;
 
+use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
+
 use bevy_asset_loader::loading_state::{
     config::ConfigureLoadingState,
     LoadingState,
@@ -19,6 +21,9 @@ pub use texture::*;
 use bevy::{ prelude::*, utils::{ HashMap, HashSet }, window::PrimaryWindow };
 
 const BOX_WIDTH: f32 = 48.0;
+
+mod hud;
+pub use hud::*;
 
 #[derive(Resource)]
 pub struct EventListeners {
@@ -153,6 +158,7 @@ fn main() {
 
     App::new()
         .add_state::<MyStates>()
+        .add_plugins(FrameTimeDiagnosticsPlugin::default())
         .insert_resource(Time::<Fixed>::from_seconds(TICK))
         .add_plugins(DefaultPlugins)
         .insert_resource(Msaa::Off)
@@ -178,7 +184,10 @@ fn main() {
                 .continue_to_state(MyStates::InGame)
                 .load_collection::<ImageAssets>()
         )
+        .add_systems(Startup, setup_fps_counter)
+        .add_systems(Update, (fps_text_update_system, fps_counter_showhide))
         .add_systems(OnEnter(MyStates::InGame), init)
+        .add_systems(Update, mouse_pos_update_system.run_if(in_state(MyStates::InGame)))
         .add_systems(FixedUpdate, mechanism_listener.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, repropagation_listener.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, mouse_input.run_if(in_state(MyStates::InGame)))
@@ -190,6 +199,7 @@ fn main() {
         .add_systems(Update, execute_listeners.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, zoom_camera.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, update_tick)
+        .add_systems(Update, update_cursor_position.run_if(in_state(MyStates::InGame)))
         .run()
 }
 
@@ -332,6 +342,34 @@ const STICKY_PISTON_HEAD: Block = Block {
 
 const AUTOSAVE_INTERVAL_SECONDS: f32 = 3.0;
 
+fn neutralize_block(mut block: &mut Block) {
+    if
+        let Block {
+            redstone: Some(Redstone { signal, .. }),
+
+            mechanism: Some(MechanismKind::RedstoneTorch),
+            ..
+        } = &mut block
+    {
+        *signal = 16;
+    }
+    if
+        let Block {
+            symmetric: false,
+            redstone: Some(Redstone { input_ports, output_ports, signal_type_port_mapping, .. }),
+            orientation,
+            ..
+        } = &mut block
+    {
+        let orientation_reversion = Orientation::port_idx_to_orientation(
+            (4 - orientation.to_port_idx()).rem_euclid(4)
+        );
+        *input_ports = orientation_reversion.rotate_ports(*input_ports);
+        *output_ports = orientation_reversion.rotate_ports(*output_ports);
+        *signal_type_port_mapping = orientation_reversion.rotate_ports(*signal_type_port_mapping);
+    }
+}
+
 fn init(
     mut commands: Commands,
     save_data: Res<Persistent<SaveData>>,
@@ -350,6 +388,19 @@ fn init(
         timer: Timer::new(Duration::from_secs_f32(AUTOSAVE_INTERVAL_SECONDS), TimerMode::Repeating),
     });
 
+    commands.spawn((
+        SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgba(1.0, 1.0, 1.0, 0.1),
+                custom_size: Some(Vec2::new(BOX_WIDTH, BOX_WIDTH)),
+                ..default()
+            },
+            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)),
+            ..default()
+        },
+        Cursor,
+    ));
+
     for ((chunk_x, chunk_y), map) in save_data.0.iter() {
         for (u, row) in map.iter().enumerate() {
             for (v, blk) in row.iter().enumerate() {
@@ -359,41 +410,8 @@ fn init(
                 listeners.update_entity(x, y);
                 if let Some(blk_data) = blk {
                     let mut blk_clone = blk_data.clone();
-                    if
-                        let Block {
-                            redstone: Some(Redstone { signal, .. }),
 
-                            mechanism: Some(MechanismKind::RedstoneTorch),
-                            ..
-                        } = &mut blk_clone
-                    {
-                        *signal = 16;
-                    }
-
-                    if
-                        let Block {
-                            symmetric: false,
-                            redstone: Some(
-                                Redstone {
-                                    input_ports,
-                                    output_ports,
-                                    signal_type_port_mapping,
-                                    ..
-                                },
-                            ),
-                            orientation,
-                            ..
-                        } = &mut blk_clone
-                    {
-                        let orientation_reversion = Orientation::port_idx_to_orientation(
-                            (4 - orientation.to_port_idx()).rem_euclid(4)
-                        );
-                        *input_ports = orientation_reversion.rotate_ports(*input_ports);
-                        *output_ports = orientation_reversion.rotate_ports(*output_ports);
-                        *signal_type_port_mapping = orientation_reversion.rotate_ports(
-                            *signal_type_port_mapping
-                        );
-                    }
+                    neutralize_block(&mut blk_clone);
 
                     place(
                         &mut chunks,
@@ -413,6 +431,9 @@ fn init(
         }
     }
 }
+
+#[derive(Component)]
+struct Cursor;
 
 pub fn update_selected_block(
     mut selected: ResMut<SelectedBlock>,
@@ -470,11 +491,38 @@ fn update_tick(
     }
 }
 
+fn update_cursor_position(
+    q_windows: Query<&Window, With<PrimaryWindow>>,
+    q_camera: Query<(&Camera, &GlobalTransform)>,
+    mut query: Query<&mut Transform, With<Cursor>>
+) {
+    let (camera, camera_transform) = q_camera.single();
+    let (x, y, _, _) = if
+        let Some(position) = q_windows
+            .single()
+            .cursor_position()
+            .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor))
+            .map(|ray| ray.origin.truncate())
+    {
+        get_mouse_coord(position.x, position.y)
+    } else {
+        return;
+    };
+
+    for mut cursor in &mut query {
+        cursor.translation = Vec3::new(
+            (y as f32) * BOX_WIDTH,
+            ((CHUNK_SIZE.0 - x - 1) as f32) * BOX_WIDTH,
+            0.0
+        );
+    }
+}
+
 pub fn mouse_input(
     mut commands: Commands,
     mut listeners: ResMut<EventListeners>,
     buttons: Res<Input<MouseButton>>,
-    selected_block: Res<SelectedBlock>,
+    mut selected_block: ResMut<SelectedBlock>,
     orientation: Res<Orientation>,
     mut chunks: ResMut<Chunks>,
     q_windows: Query<&Window, With<PrimaryWindow>>,
@@ -482,10 +530,11 @@ pub fn mouse_input(
     image_assets: Res<ImageAssets>,
     mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     mut propagation_queue: ResMut<PropagationQueue>,
-    mut calculations: ResMut<Calculations>
+    mut calculations: ResMut<Calculations>,
+    keyboard_input: Res<Input<KeyCode>>
 ) {
     let (camera, camera_transform) = q_camera.single();
-    let (x, y) = if
+    let (x, y, x_dist, y_dist) = if
         let Some(position) = q_windows
             .single()
             .cursor_position()
@@ -498,23 +547,39 @@ pub fn mouse_input(
     };
 
     if buttons.just_pressed(MouseButton::Right) {
-        if let Some(blk) = selected_block.get_block() {
-            if
-                !place(
-                    chunks.as_mut(),
-                    blk,
-                    *orientation,
-                    x,
-                    y,
-                    &mut listeners,
-                    &mut commands,
-                    &image_assets,
-                    &mut query,
-                    &mut propagation_queue,
-                    &mut calculations.0
-                )
-            {
-                interact(chunks.as_mut(), x, y, &mut commands, &image_assets, &mut query);
+        if keyboard_input.pressed(KeyCode::ControlLeft) {
+            let blk = chunks.get_block_ref(x, y);
+            if let Some(blk) = blk {
+                let mut clicked_blk = blk.clone();
+                neutralize_block(&mut clicked_blk);
+                selected_block.0 = Some(clicked_blk);
+            }
+        } else {
+            if let Some(blk) = selected_block.get_block() {
+                let mut curr_orientation = *orientation;
+                if !keyboard_input.pressed(KeyCode::ShiftLeft) {
+                    let horiz = if y_dist > 0.5 { Orientation::Right } else { Orientation::Left };
+                    let vertical = if x_dist > 0.5 { Orientation::Down } else { Orientation::Up };
+                    curr_orientation = if (x_dist - 0.5).abs() > (y_dist - 0.5).abs() { vertical } else { horiz };
+                }
+
+                if
+                    !place(
+                        chunks.as_mut(),
+                        blk,
+                        curr_orientation,
+                        x,
+                        y,
+                        &mut listeners,
+                        &mut commands,
+                        &image_assets,
+                        &mut query,
+                        &mut propagation_queue,
+                        &mut calculations.0
+                    )
+                {
+                    interact(chunks.as_mut(), x, y, &mut commands, &image_assets, &mut query);
+                }
             }
         }
     } else if buttons.just_pressed(MouseButton::Left) {
@@ -532,10 +597,14 @@ pub fn mouse_input(
     }
 }
 
-fn get_mouse_coord(x: f32, y: f32) -> (i128, i128) {
-    let x_coord = (CHUNK_SIZE.1 as f32) - ((y + BOX_WIDTH / 2.0) / BOX_WIDTH).floor() - 1.0;
-    let y_coord = ((x + BOX_WIDTH / 2.0) / BOX_WIDTH).floor();
-    (x_coord as i128, y_coord as i128)
+fn get_mouse_coord(x: f32, y: f32) -> (i128, i128, f32, f32) {
+    let x_coord_raw = (CHUNK_SIZE.1 as f32) - (y + BOX_WIDTH / 2.0) / BOX_WIDTH;
+    let y_coord_raw = (x + BOX_WIDTH / 2.0) / BOX_WIDTH;
+
+    let x_dist = x_coord_raw - x_coord_raw.floor();
+    let y_dist = y_coord_raw - y_coord_raw.floor();
+
+    (x_coord_raw.floor() as i128, y_coord_raw.floor() as i128, x_dist, y_dist)
 }
 
 fn update_entity_listener(
@@ -755,7 +824,7 @@ fn repropagation_listener(
             prev_signal_type,
             &mut listeners,
             &mut propagation_queue,
-            &mut calculations.0,
+            &mut calculations.0
         );
     }
 }
