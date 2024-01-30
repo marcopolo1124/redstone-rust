@@ -93,7 +93,7 @@ pub fn execute_mechanism(
             *movable = false;
             if !*extended && on {
                 let (next_x, next_y) = orientation.get_next_coord(x, y);
-                let affected_blocks = get_power(chunks, next_x, next_y, orientation, 20);
+                let affected_blocks = get_power(chunks, next_x, next_y, orientation, 12);
                 let moved = move_blocks(
                     chunks,
                     next_x,
@@ -113,7 +113,7 @@ pub fn execute_mechanism(
                     if let Some(extended) = get_extended(chunks, x, y) {
                         *extended = true;
                     }
-                    
+
                     place(
                         chunks,
                         piston_head,
@@ -159,7 +159,7 @@ pub fn execute_mechanism(
                 if is_sticky {
                     let (next_next_x, next_next_y) = orientation.get_next_coord(next_x, next_y);
                     let pull_dir = orientation.get_opposing();
-                    let affected_blocks = get_power(chunks, next_next_x, next_next_y, pull_dir, 20);
+                    let affected_blocks = get_power(chunks, next_next_x, next_next_y, pull_dir, 12);
                     move_blocks(
                         chunks,
                         next_next_x,
@@ -401,19 +401,26 @@ fn get_power(
         traversed.insert((x, y));
         if let Some(Block { movable: true, sticky, .. }) = chunks.get_block_ref(x, y) {
             let (next_x, next_y) = orientation.get_next_coord(x, y);
-            if !traversed.contains(&(next_x, next_y)) && strength > 0 {
-                queue.push_back((next_x, next_y, strength - 1));
+            if let Some(_) = chunks.get_block_ref(next_x, next_y) {
+                if !traversed.contains(&(next_x, next_y)) && strength > 0 {
+                    queue.push_back((next_x, next_y, strength - 1));
+                }
             }
-
             if *sticky {
                 for adj in Orientation::iter() {
                     let (next_x, next_y) = adj.get_next_coord(x, y);
-                    if !traversed.contains(&(next_x, next_y)) && strength > 0 {
-                        queue.push_back((next_x, next_y, strength - 1));
+                    if let Some(_) = chunks.get_block_ref(next_x, next_y) {
+                        if !traversed.contains(&(next_x, next_y)) && strength > 0 {
+                            queue.push_back((next_x, next_y, strength - 1));
+                        }
                     }
                 }
             }
         }
+    }
+
+    if traversed.len() > 12 {
+        return HashSet::new();
     }
 
     return traversed;

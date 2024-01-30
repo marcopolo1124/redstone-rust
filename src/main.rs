@@ -395,11 +395,16 @@ fn neutralize_block(mut block: &mut Block) {
         let Block {
             redstone: Some(Redstone { signal, .. }),
 
-            mechanism: Some(MechanismKind::RedstoneTorch),
+            mechanism,
             ..
         } = &mut block
     {
-        *signal = 16;
+        if let Some(MechanismKind::RedstoneTorch) = mechanism{
+            *signal = 16;
+        } else{
+            *signal = 0;
+        }
+        
     }
     if
         let Block {
