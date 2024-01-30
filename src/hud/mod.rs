@@ -16,6 +16,9 @@ pub struct XText;
 #[derive(Component)]
 pub struct YText;
 
+#[derive(Component)]
+pub struct TPSText;
+
 pub fn setup_fps_counter(
     mut commands: Commands,
 ) {
@@ -143,7 +146,41 @@ pub fn setup_fps_counter(
             ..Default::default()
         },
     )).id();
-    commands.entity(root).push_children(&[text_fps, y_coord, x_coord]);
+
+
+
+    let updates_per_second = commands.spawn((
+        TPSText,
+        TextBundle {
+            // use two sections, so it is easy to update just the number
+            text: Text::from_sections([
+                TextSection {
+                    value: "ticks /s: ".into(),
+                    style: TextStyle {
+                        font_size: 16.0,
+                        color: Color::WHITE,
+                        // if you want to use your game's font asset,
+                        // uncomment this and provide the handle:
+                        // font: my_font_handle
+                        ..default()
+                    }
+                },
+                TextSection {
+                    value: " N/A".into(),
+                    style: TextStyle {
+                        font_size: 16.0,
+                        color: Color::WHITE,
+                        // if you want to use your game's font asset,
+                        // uncomment this and provide the handle:
+                        // font: my_font_handle
+                        ..default()
+                    }
+                },
+            ]),
+            ..Default::default()
+        },
+    )).id();
+    commands.entity(root).push_children(&[text_fps, y_coord, x_coord, updates_per_second]);
 }
 
 pub fn fps_text_update_system(
@@ -242,4 +279,20 @@ pub fn mouse_pos_update_system(
     };
 
 
+}
+
+
+pub fn update_tps_text(
+    time: Res<Time>,
+    mut updates: ResMut<UpdatesPerSecondTimer>,
+    mut tps_query: Query<&mut Text, With<TPSText>> 
+) {
+    updates.timer.tick(time.delta());
+    if updates.timer.finished() {
+        let tps = updates.number_of_updates as f32 / UPDATES_TIMER_INTERVAL_SECONDS;
+        for mut text in &mut tps_query {
+            text.sections[1].value = format!("{tps:>4.0}");
+        };
+        updates.number_of_updates = 0;
+    }
 }

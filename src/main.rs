@@ -80,6 +80,12 @@ struct AutosaveTimer {
     timer: Timer,
 }
 
+#[derive(Resource)]
+pub struct UpdatesPerSecondTimer {
+    pub number_of_updates: u16,
+    pub timer: Timer,
+}
+
 #[derive(Clone, Debug)]
 struct PropagationArgs {
     x: i128,
@@ -145,9 +151,6 @@ impl PropagationQueue {
 
 const TICK: f64 = 0.1;
 
-#[derive(Resource)]
-pub struct Calculations(u32);
-
 fn main() {
     let chunks = Chunks::new();
     let event_listeners = EventListeners::new();
@@ -164,7 +167,6 @@ fn main() {
         .insert_resource(Msaa::Off)
         .insert_resource(chunks)
         .insert_resource(event_listeners)
-        .insert_resource(Calculations(0))
         .insert_resource(PropagationQueue(Vec::new()))
         .insert_resource(SelectedBlock(Some(DIRT)))
         .insert_resource(Orientation::Up)
@@ -200,6 +202,7 @@ fn main() {
         .add_systems(Update, zoom_camera.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, update_tick)
         .add_systems(Update, update_cursor_position.run_if(in_state(MyStates::InGame)))
+        .add_systems(Update, update_tps_text.run_if(in_state(MyStates::InGame)))
         .run()
 }
 
@@ -328,6 +331,7 @@ const STICKY_PISTON_HEAD: Block = Block {
 };
 
 const AUTOSAVE_INTERVAL_SECONDS: f32 = 3.0;
+const UPDATES_TIMER_INTERVAL_SECONDS: f32 = 5.0;
 
 fn neutralize_block(mut block: &mut Block) {
     if
@@ -364,8 +368,7 @@ fn init(
     mut listeners: ResMut<EventListeners>,
     image_assets: Res<ImageAssets>,
     mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>,
-    mut propagation_queue: ResMut<PropagationQueue>,
-    mut calculations: ResMut<Calculations>
+    mut propagation_queue: ResMut<PropagationQueue>
 ) {
     commands.spawn(Camera2dBundle {
         ..default()
@@ -373,6 +376,14 @@ fn init(
 
     commands.insert_resource(AutosaveTimer {
         timer: Timer::new(Duration::from_secs_f32(AUTOSAVE_INTERVAL_SECONDS), TimerMode::Repeating),
+    });
+
+    commands.insert_resource(UpdatesPerSecondTimer {
+        timer: Timer::new(
+            Duration::from_secs_f32(UPDATES_TIMER_INTERVAL_SECONDS),
+            TimerMode::Repeating
+        ),
+        number_of_updates: 0,
     });
 
     commands.spawn((
@@ -387,6 +398,8 @@ fn init(
         },
         Cursor,
     ));
+
+    let mut calculations = 0;
 
     for ((chunk_x, chunk_y), map) in save_data.0.iter() {
         for (u, row) in map.iter().enumerate() {
@@ -411,7 +424,7 @@ fn init(
                         &image_assets,
                         &mut query,
                         &mut propagation_queue,
-                        &mut calculations.0
+                        &mut calculations
                     );
                 }
             }
@@ -471,7 +484,7 @@ fn update_tick(
         fast.0 = !fast.0;
         let mutable = time.as_mut();
         if fast.0 {
-            *mutable = Time::from_seconds(0.005);
+            *mutable = Time::from_seconds(0.001);
         } else {
             *mutable = Time::from_seconds(TICK);
         }
@@ -517,7 +530,6 @@ pub fn mouse_input(
     image_assets: Res<ImageAssets>,
     mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     mut propagation_queue: ResMut<PropagationQueue>,
-    mut calculations: ResMut<Calculations>,
     keyboard_input: Res<Input<KeyCode>>
 ) {
     let (camera, camera_transform) = q_camera.single();
@@ -532,6 +544,8 @@ pub fn mouse_input(
     } else {
         return;
     };
+
+    let mut calculations = 0;
 
     if buttons.just_pressed(MouseButton::Right) {
         if keyboard_input.pressed(KeyCode::ControlLeft) {
@@ -566,7 +580,7 @@ pub fn mouse_input(
                         &image_assets,
                         &mut query,
                         &mut propagation_queue,
-                        &mut calculations.0
+                        &mut calculations
                     )
                 {
                     interact(chunks.as_mut(), x, y, &mut commands, &image_assets, &mut query);
@@ -583,7 +597,7 @@ pub fn mouse_input(
             &image_assets,
             &mut query,
             &mut propagation_queue,
-            &mut calculations.0
+            &mut calculations
         );
     }
 }
@@ -747,10 +761,11 @@ fn execute_listeners(
     image_assets: Res<ImageAssets>,
     mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     mut propagation_queue: ResMut<PropagationQueue>,
-    mut calculations: ResMut<Calculations>
+    mut updates_timer: ResMut<UpdatesPerSecondTimer>
 ) {
+    let mut calculations = 0;
 
-    propagation_queue.execute_queue(&mut chunks, &mut listeners, &mut calculations.0);
+    propagation_queue.execute_queue(&mut chunks, &mut listeners, &mut calculations);
 
     if !propagation_queue.is_empty() {
         return;
@@ -773,7 +788,7 @@ fn execute_listeners(
             prev_signal_type,
             &mut listeners,
             &mut propagation_queue,
-            &mut calculations.0
+            &mut calculations
         );
     }
 
@@ -781,7 +796,7 @@ fn execute_listeners(
         return;
     }
 
-    let calc = &mut calculations.0;
+    let calc = &mut calculations;
     *calc = 0;
 
     let mechanism_listener = listeners.mechanism_listener.clone();
@@ -798,7 +813,7 @@ fn execute_listeners(
             &image_assets,
             &mut query,
             &mut propagation_queue,
-            &mut calculations.0
+            &mut calculations
         );
     }
 
@@ -806,6 +821,7 @@ fn execute_listeners(
         update_entity(&mut commands, &mut chunks, *x, *y, &image_assets, &mut query);
     }
     listeners.entity_map_update.clear();
+    updates_timer.number_of_updates += 1;
 }
 
 fn interact(
