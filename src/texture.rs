@@ -53,6 +53,11 @@ pub struct ImageAssets {
     #[asset(path = "images/redstone_dust_var.png")]
     #[asset(image(sampler = nearest))]
     redstone_dust_var: Handle<TextureAtlas>,
+
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 1, rows = 1))]
+    #[asset(path = "images/slime_block.png")]
+    #[asset(image(sampler = nearest))]
+    slime_block: Handle<TextureAtlas>,
 }
 
 pub fn get_atlas(texture_name: TextureName, image_assets: &ImageAssets) -> Handle<TextureAtlas> {
@@ -66,7 +71,8 @@ pub fn get_atlas(texture_name: TextureName, image_assets: &ImageAssets) -> Handl
         TextureName::PistonHead => image_assets.piston_head.clone(),
         TextureName::StickyPistonHead => image_assets.sticky_piston_head.clone(),
         TextureName::Repeater => image_assets.repeater.clone(),
-        TextureName::Observer => image_assets.observer.clone()
+        TextureName::Observer => image_assets.observer.clone(),
+        TextureName::SlimeBlock => image_assets.slime_block.clone(),
     }
 }
 
@@ -81,5 +87,6 @@ pub enum TextureName {
     PistonHead,
     StickyPistonHead,
     Repeater,
-    Observer
+    Observer,
+    SlimeBlock
 }

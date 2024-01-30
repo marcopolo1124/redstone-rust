@@ -1,4 +1,5 @@
 pub use super::*;
+use std::collections::VecDeque;
 
 fn get_extended(chunks: &mut Chunks, x: i128, y: i128) -> Option<&mut bool> {
     let blk = chunks.get_block(x, y);
@@ -14,10 +15,7 @@ fn get_extended(chunks: &mut Chunks, x: i128, y: i128) -> Option<&mut bool> {
 
 fn get_movable(chunks: &mut Chunks, x: i128, y: i128) -> Option<&mut bool> {
     let blk = chunks.get_block(x, y);
-    if
-        let Some(Block {movable, .. }) =
-            blk
-    {
+    if let Some(Block { movable, .. }) = blk {
         Some(movable)
     } else {
         None
@@ -95,25 +93,27 @@ pub fn execute_mechanism(
             *movable = false;
             if !*extended && on {
                 let (next_x, next_y) = orientation.get_next_coord(x, y);
+                let affected_blocks = get_power(chunks, next_x, next_y, orientation, 20);
                 let moved = move_blocks(
                     chunks,
                     next_x,
                     next_y,
                     orientation,
-                    HashSet::new(),
-                    20,
+                    &affected_blocks,
                     listeners,
                     &mut commands,
                     &image_assets,
                     query,
                     propagation_queue,
                     calculations,
-                    &mut traversed
+                    &mut traversed,
+                    orientation.get_opposing()
                 );
                 if moved {
                     if let Some(extended) = get_extended(chunks, x, y) {
                         *extended = true;
                     }
+                    
                     place(
                         chunks,
                         piston_head,
@@ -136,7 +136,7 @@ pub fn execute_mechanism(
                 }
             } else if *extended && !on {
                 *extended = false;
-                
+
                 listeners.update_entity(x, y);
                 let (next_x, next_y) = orientation.get_next_coord(x, y);
                 let next_block = chunks.get_block(next_x, next_y);
@@ -159,20 +159,21 @@ pub fn execute_mechanism(
                 if is_sticky {
                     let (next_next_x, next_next_y) = orientation.get_next_coord(next_x, next_y);
                     let pull_dir = orientation.get_opposing();
+                    let affected_blocks = get_power(chunks, next_next_x, next_next_y, pull_dir, 20);
                     move_blocks(
                         chunks,
                         next_next_x,
                         next_next_y,
                         pull_dir,
-                        HashSet::new(),
-                        20,
+                        &affected_blocks,
                         listeners,
                         &mut commands,
                         &image_assets,
                         query,
                         propagation_queue,
                         calculations,
-                        &mut traversed
+                        &mut traversed,
+                        pull_dir
                     );
                 }
                 if let Some(movable) = get_movable(chunks, x, y) {
@@ -276,22 +277,18 @@ fn move_blocks(
     x: i128,
     y: i128,
     orientation: Orientation,
-    from: HashSet<Orientation>,
-    strength: usize,
+    affected_blocks: &HashSet<(i128, i128)>,
     listeners: &mut EventListeners,
     mut commands: &mut Commands,
     image_assets: &ImageAssets,
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     propagation_queue: &mut PropagationQueue,
     calculations: &mut u32,
-    traversed: &mut HashSet<(i128, i128)>
+    traversed: &mut HashSet<(i128, i128)>,
+    from: Orientation
 ) -> bool {
-    if strength <= 0 {
-        return false;
-    }
-
     let maybe_blk = chunks.get_block(x, y);
-    let mut blk = if let Some(blk) = maybe_blk {
+    let blk = if let Some(blk) = maybe_blk {
         if blk.movable {
             *blk
         } else {
@@ -301,13 +298,13 @@ fn move_blocks(
         return true;
     };
 
+    if !affected_blocks.contains(&(x, y)) {
+        return false;
+    }
+
     if traversed.contains(&(x, y)) {
         return false;
     }
-    traversed.insert((x, y));
-
-    let mut restricted = from.clone();
-    restricted.insert(orientation.get_opposing());
 
     let (next_x, next_y) = orientation.get_next_coord(x, y);
     let moved = move_blocks(
@@ -315,87 +312,109 @@ fn move_blocks(
         next_x,
         next_y,
         orientation,
-        restricted,
-        strength - 1,
+        affected_blocks,
         listeners,
         &mut commands,
         &image_assets,
         query,
         propagation_queue,
         calculations,
-        traversed
+        traversed,
+        orientation.get_opposing()
     );
 
     if moved {
         if
-            let Block { redstone: Some(Redstone { ref mut signal, ref mut signal_type, .. }), .. } =
-                blk
+            place(
+                chunks,
+                blk,
+                blk.orientation,
+                next_x,
+                next_y,
+                listeners,
+                &mut commands,
+                &image_assets,
+                query,
+                propagation_queue,
+                calculations
+            )
         {
-            if
-                *signal_type == Some(SignalType::Strong(false)) ||
-                *signal_type == Some(SignalType::Weak(false))
-            {
-                *signal = 0;
-                *signal_type = None;
-            }
+            destroy(
+                chunks,
+                x,
+                y,
+                listeners,
+                &mut commands,
+                &image_assets,
+                query,
+                propagation_queue,
+                calculations
+            );
         }
 
-        place(
-            chunks,
-            blk,
-            blk.orientation,
-            next_x,
-            next_y,
-            listeners,
-            &mut commands,
-            &image_assets,
-            query,
-            propagation_queue,
-            calculations
-        );
-
-        destroy(
-            chunks,
-            x,
-            y,
-            listeners,
-            &mut commands,
-            &image_assets,
-            query,
-            propagation_queue,
-            calculations
-        );
-        listeners.update_entity(x, y);
+        traversed.insert((next_x, next_y));
+        traversed.insert((x, y));
 
         if blk.sticky {
-
-
             for neighbor_orientation in Orientation::iter() {
                 let (next_x, next_y) = neighbor_orientation.get_next_coord(x, y);
-                if neighbor_orientation != orientation && !from.contains(&neighbor_orientation){
-
-                    let mut restricted = from.clone();
-                    restricted.insert(neighbor_orientation.get_opposing());
+                if
+                    neighbor_orientation != orientation &&
+                    neighbor_orientation != from &&
+                    !traversed.contains(&(next_x, next_y))
+                {
                     move_blocks(
                         chunks,
                         next_x,
                         next_y,
                         orientation,
-                        restricted,
-                        strength - 1,
+                        affected_blocks,
                         listeners,
                         &mut commands,
                         &image_assets,
                         query,
                         propagation_queue,
                         calculations,
-                        traversed
+                        traversed,
+                        neighbor_orientation.get_opposing()
                     );
                 }
-
             }
         }
     }
 
     moved
+}
+
+fn get_power(
+    chunks: &mut Chunks,
+    x: i128,
+    y: i128,
+    orientation: Orientation,
+    strength: u32
+) -> HashSet<(i128, i128)> {
+    let mut queue = VecDeque::from([(x, y, strength)]);
+    let mut traversed: HashSet<(i128, i128)> = HashSet::new();
+
+    while queue.len() > 0 {
+        let (x, y, strength) = queue.pop_front().unwrap();
+        traversed.insert((x, y));
+        if let Some(Block { movable: true, sticky, .. }) = chunks.get_block_ref(x, y) {
+            let (next_x, next_y) = orientation.get_next_coord(x, y);
+            if !traversed.contains(&(next_x, next_y)) && strength > 0 {
+                queue.push_back((next_x, next_y, strength - 1));
+            }
+
+            if *sticky {
+                for adj in Orientation::iter() {
+                    let (next_x, next_y) = adj.get_next_coord(x, y);
+                    if !traversed.contains(&(next_x, next_y)) && strength > 0 {
+                        queue.push_back((next_x, next_y, strength - 1));
+                    }
+                }
+            }
+        }
+    }
+
+    return traversed;
 }

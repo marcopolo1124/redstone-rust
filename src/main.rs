@@ -242,7 +242,7 @@ const SLIME: Block = Block {
     movable: true,
     sticky: true,
     orientation: Orientation::Up,
-    texture_name: TextureName::Dirt,
+    texture_name: TextureName::SlimeBlock,
     symmetric: true,
     redstone: Some(Redstone {
         signal: 0,
