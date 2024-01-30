@@ -560,7 +560,11 @@ pub fn mouse_input(
                 if !keyboard_input.pressed(KeyCode::ShiftLeft) {
                     let horiz = if y_dist > 0.5 { Orientation::Right } else { Orientation::Left };
                     let vertical = if x_dist > 0.5 { Orientation::Down } else { Orientation::Up };
-                    curr_orientation = if (x_dist - 0.5).abs() > (y_dist - 0.5).abs() { vertical } else { horiz };
+                    curr_orientation = if (x_dist - 0.5).abs() > (y_dist - 0.5).abs() {
+                        vertical
+                    } else {
+                        horiz
+                    };
                 }
 
                 if
@@ -616,6 +620,10 @@ fn update_entity_listener(
     mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>
 ) {
     if !propagation_queue.is_empty() {
+        return;
+    }
+
+    if listeners.repropagation_listener.len() > 0 {
         return;
     }
     for (x, y) in &listeners.entity_map_update {
@@ -779,6 +787,10 @@ fn mechanism_listener(
         return;
     }
 
+    if listeners.repropagation_listener.len() > 0 {
+        return;
+    }
+
     let calc = &mut calculations.0;
     *calc = 0;
 
@@ -807,6 +819,10 @@ fn repropagation_listener(
     mut propagation_queue: ResMut<PropagationQueue>,
     mut calculations: ResMut<Calculations>
 ) {
+
+    if !propagation_queue.is_empty(){
+        return;
+    }
     let queue = listeners.repropagation_listener.clone();
     listeners.repropagation_listener.clear();
 
