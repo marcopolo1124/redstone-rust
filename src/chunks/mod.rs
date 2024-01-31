@@ -130,7 +130,7 @@ impl Chunks {
 
 pub fn place(
     mut chunks: &mut Chunks,
-    mut blk: Block,
+    blk: Block,
     mut orientation: Orientation,
     x: i128,
     y: i128,
@@ -145,8 +145,6 @@ pub fn place(
     if let Some(_) = curr {
         return false;
     }
-
-    neutralize_block(&mut blk);
 
     *calculations = 0;
 

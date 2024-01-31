@@ -166,6 +166,9 @@ impl PropagationQueue {
 
 const TICK: f64 = 0.1;
 
+#[derive(Resource)]
+pub struct TextureToBlockMap(HashMap<TextureName, Block>);
+
 fn main() {
     let chunks = Chunks::new();
     let event_listeners = EventListeners::new();
@@ -173,6 +176,19 @@ fn main() {
         ::config_dir()
         .map(|dir| dir.join("redstone_rust"))
         .unwrap_or(Path::new("local").join("save"));
+
+    let all_blocks = HashMap::from([
+        (TextureName::Dirt, DIRT),
+        (TextureName::RedstoneDust, REDSTONE_DUST),
+        (TextureName::RedstoneTorch, REDSTONE_TORCH),
+        (TextureName::Observer, OBSERVER),
+        (TextureName::Piston, PISTON),
+        (TextureName::PistonHead, PISTON_HEAD),
+        (TextureName::StickyPiston, STICKY_PISTON),
+        (TextureName::StickyPistonHead, STICKY_PISTON_HEAD),
+        (TextureName::Repeater, REPEATER),
+        (TextureName::SlimeBlock, SLIME),
+    ]);
 
     App::new()
         .add_state::<MyStates>()
@@ -186,6 +202,7 @@ fn main() {
         .insert_resource(SelectedBlock(Some(DIRT)))
         .insert_resource(Orientation::Up)
         .insert_resource(Fast(false))
+        .insert_resource(TextureToBlockMap(all_blocks))
         .insert_resource(
             Persistent::<SaveData>
                 ::builder()
@@ -390,39 +407,6 @@ const STICKY_PISTON_HEAD: Block = Block {
 const AUTOSAVE_INTERVAL_SECONDS: f32 = 3.0;
 const UPDATES_TIMER_INTERVAL_SECONDS: f32 = 5.0;
 
-fn neutralize_block(mut block: &mut Block) {
-    if
-        let Block {
-            redstone: Some(Redstone { signal, .. }),
-
-            mechanism,
-            ..
-        } = &mut block
-    {
-        if let Some(MechanismKind::RedstoneTorch) = mechanism{
-            *signal = 16;
-        } else{
-            *signal = 0;
-        }
-        
-    }
-    if
-        let Block {
-            symmetric: false,
-            redstone: Some(Redstone { input_ports, output_ports, signal_type_port_mapping, .. }),
-            orientation,
-            ..
-        } = &mut block
-    {
-        let orientation_reversion = Orientation::port_idx_to_orientation(
-            (4 - orientation.to_port_idx()).rem_euclid(4)
-        );
-        *input_ports = orientation_reversion.rotate_ports(*input_ports);
-        *output_ports = orientation_reversion.rotate_ports(*output_ports);
-        *signal_type_port_mapping = orientation_reversion.rotate_ports(*signal_type_port_mapping);
-    }
-}
-
 fn init(
     mut commands: Commands,
     save_data: Res<Persistent<SaveData>>,
@@ -430,7 +414,8 @@ fn init(
     mut listeners: ResMut<EventListeners>,
     image_assets: Res<ImageAssets>,
     mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>,
-    mut propagation_queue: ResMut<PropagationQueue>
+    mut propagation_queue: ResMut<PropagationQueue>,
+    texture_to_block_map: Res<TextureToBlockMap>
 ) {
     commands.spawn(Camera2dBundle {
         ..default()
@@ -471,14 +456,15 @@ fn init(
 
                 listeners.update_entity(x, y);
                 if let Some(blk_data) = blk {
-                    let mut blk_clone = blk_data.clone();
-
-                    neutralize_block(&mut blk_clone);
-
+                    let mut blk_clone = *texture_to_block_map.0.get(&blk_data.texture_name).unwrap();
+                    blk_clone.mechanism = blk_data.mechanism;
+                    if let Some(Redstone { ref mut signal, .. }) = blk_clone.redstone {
+                        *signal = blk_data.redstone.unwrap().signal;
+                    }
                     place(
                         &mut chunks,
                         blk_clone,
-                        blk_clone.orientation,
+                        blk_data.orientation,
                         x,
                         y,
                         &mut listeners,
@@ -596,7 +582,8 @@ pub fn mouse_input(
     image_assets: Res<ImageAssets>,
     mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     mut propagation_queue: ResMut<PropagationQueue>,
-    keyboard_input: Res<Input<KeyCode>>
+    keyboard_input: Res<Input<KeyCode>>,
+    texture_to_block_map: Res<TextureToBlockMap>
 ) {
     let (camera, camera_transform) = q_camera.single();
     let (x, y, x_dist, y_dist) = if
@@ -617,9 +604,7 @@ pub fn mouse_input(
         if keyboard_input.pressed(KeyCode::ControlLeft) {
             let blk = chunks.get_block_ref(x, y);
             if let Some(blk) = blk {
-                let mut clicked_blk = blk.clone();
-                neutralize_block(&mut clicked_blk);
-                selected_block.0 = Some(clicked_blk);
+                selected_block.0 = Some(*texture_to_block_map.0.get(&blk.texture_name).unwrap());
             }
         } else {
             if let Some(blk) = selected_block.get_block() {
@@ -649,7 +634,15 @@ pub fn mouse_input(
                         &mut calculations
                     )
                 {
-                    interact(chunks.as_mut(), x, y, &mut commands, &image_assets, &mut query, &mut listeners);
+                    interact(
+                        chunks.as_mut(),
+                        x,
+                        y,
+                        &mut commands,
+                        &image_assets,
+                        &mut query,
+                        &mut listeners
+                    );
                 }
             }
         }
@@ -872,9 +865,9 @@ fn execute_listeners(
     let mechanism_listener = listeners.mechanism_listener.clone();
     listeners.mechanism_listener.clear();
 
-    // if mechanism_listener.len () > 0 {
+    // if mechanism_listener.len() > 0 {
     //     println!("{:?}", mechanism_listener);
-    // };
+    // }
 
     for ((x, y), on) in mechanism_listener {
         execute_mechanism(
@@ -893,7 +886,7 @@ fn execute_listeners(
 
     let entity_map_update = listeners.entity_map_update.clone();
 
-    for (x, y) in entity_map_update{
+    for (x, y) in entity_map_update {
         update_entity(&mut commands, &mut chunks, x, y, &image_assets, &mut query);
         alert_neighbours(x, y, &chunks, &mut listeners);
     }
@@ -985,7 +978,7 @@ pub fn zoom_camera(
     }
 }
 
-pub fn alert_neighbours(x: i128, y: i128, chunks: &Chunks, listeners: &mut EventListeners){
+pub fn alert_neighbours(x: i128, y: i128, chunks: &Chunks, listeners: &mut EventListeners) {
     for orientation in Orientation::iter() {
         let (next_x, next_y) = orientation.get_next_coord(x, y);
         listeners.change_state(next_x, next_y, orientation.get_opposing(), &chunks);
