@@ -164,7 +164,7 @@ pub fn propagate_signal_at(
             }
         }
     }
-    if input_signal == 0 {
+if input_signal == 0 {
         listeners.repropagate(x, y)
     }
 }
@@ -218,7 +218,7 @@ pub fn get_max_prev(
             {
                 if
                     output_ports[port_orientation.get_opposing().to_port_idx()] &&
-                    (*signal > max_signal || (max_signal_loc == None && *signal > 0))
+                    (*signal >= max_signal || (max_signal_loc == None && *signal > 0))
                 {
                     max_signal = *signal;
                     max_signal_loc = Some(port_orientation);
@@ -229,7 +229,25 @@ pub fn get_max_prev(
                         signal_type = Some(sig_type);
                     }
 
-                    max_signal_type = signal_type;
+                    let max_type_value = match max_signal_type {
+                        Some(SignalType::Strong(true)) => 10,
+                        Some(SignalType::Strong(false)) => 9,
+                        Some(SignalType::Weak(true)) => 8,
+                        Some(SignalType::Weak(false)) => 7,
+                        None => 0,
+                    };
+
+                    let type_value = match signal_type {
+                        Some(SignalType::Strong(true)) => 10,
+                        Some(SignalType::Strong(false)) => 9,
+                        Some(SignalType::Weak(true)) => 8,
+                        Some(SignalType::Weak(false)) => 7,
+                        None => 0,
+                    };
+
+                    if type_value > max_type_value {
+                        max_signal_type = signal_type;
+                    }
                 }
             }
         }
