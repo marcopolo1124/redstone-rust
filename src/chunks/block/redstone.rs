@@ -58,6 +58,7 @@ pub fn propagate_signal_at(
                 if input_signal > 0 {
                     listeners.turn_mechanism_on(x, y);
                 } else {
+                    // println!("turn off {x} {y}");
                     listeners.turn_mechanism_off(x, y);
                 }
             }

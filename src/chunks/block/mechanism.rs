@@ -203,7 +203,7 @@ pub fn execute_mechanism(
                 }
             } else if *countdown == 0 {
                 *countdown -= 1;
-                if signal <= 0 {
+                if signal <= 0 && on {
                     propagate_signal_at(
                         chunks,
                         x,
@@ -216,10 +216,7 @@ pub fn execute_mechanism(
                         propagation_queue,
                         calculations
                     );
-                    if !on {
-                        listeners.turn_mechanism_off(x, y)
-                    }
-                } else {
+                } else if signal > 0 && !on{
                     propagate_signal_at(
                         chunks,
                         x,
@@ -232,9 +229,6 @@ pub fn execute_mechanism(
                         propagation_queue,
                         calculations
                     );
-                    if on {
-                        listeners.turn_mechanism_on(x, y)
-                    }
                 }
             }
         }
