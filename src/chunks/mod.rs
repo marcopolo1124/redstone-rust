@@ -140,11 +140,15 @@ pub fn place(
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     propagation_queue: &mut PropagationQueue,
     calculations: &mut u32,
+    texture_to_block_map: &HashMap<TextureName, Block>
 ) -> bool {
     let curr = chunks.get_block(x, y);
     if let Some(_) = curr {
         return false;
     }
+
+    let mut blk_clone = *texture_to_block_map.get(&blk.texture_name).unwrap();
+    blk_clone.mechanism = blk.mechanism;
 
     *calculations = 0;
 
@@ -152,7 +156,7 @@ pub fn place(
         orientation = Orientation::Up;
     }
 
-    let redstone = if let Some(redstone) = blk.redstone {
+    let redstone = if let Some(redstone) = blk_clone.redstone {
         Some(Redstone {
             input_ports: orientation.rotate_ports(redstone.input_ports),
             output_ports: orientation.rotate_ports(redstone.output_ports),
@@ -166,7 +170,7 @@ pub fn place(
     *curr = Some(Block {
         orientation,
         redstone,
-        ..blk
+        ..blk_clone
     });
 
     if let Some(rs) = redstone {

@@ -472,7 +472,8 @@ fn init(
                         &image_assets,
                         &mut query,
                         &mut propagation_queue,
-                        &mut calculations
+                        &mut calculations,
+                        &texture_to_block_map.0
                     );
                 }
             }
@@ -631,7 +632,8 @@ pub fn mouse_input(
                         &image_assets,
                         &mut query,
                         &mut propagation_queue,
-                        &mut calculations
+                        &mut calculations,
+                        &texture_to_block_map.0
                     )
                 {
                     interact(
@@ -827,7 +829,8 @@ fn execute_listeners(
     image_assets: Res<ImageAssets>,
     mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     mut propagation_queue: ResMut<PropagationQueue>,
-    mut updates_timer: ResMut<UpdatesPerSecondTimer>
+    mut updates_timer: ResMut<UpdatesPerSecondTimer>,
+    texture_to_block_map: Res<TextureToBlockMap>
 ) {
     let mut calculations = 0;
 
@@ -880,7 +883,8 @@ fn execute_listeners(
             &image_assets,
             &mut query,
             &mut propagation_queue,
-            &mut calculations
+            &mut calculations,
+            &texture_to_block_map.0
         );
     }
 

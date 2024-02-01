@@ -32,7 +32,8 @@ pub fn execute_mechanism(
     image_assets: &ImageAssets,
     query: &mut Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     propagation_queue: &mut PropagationQueue,
-    calculations: &mut u32
+    calculations: &mut u32,
+    texture_to_block_map: &HashMap<TextureName, Block>
 ) {
     let maybe_blk = chunks.get_block(x, y);
     let blk = if let Some(blk) = maybe_blk {
@@ -107,7 +108,8 @@ pub fn execute_mechanism(
                     propagation_queue,
                     calculations,
                     &mut traversed,
-                    orientation.get_opposing()
+                    orientation.get_opposing(),
+                    texture_to_block_map
                 );
                 if moved {
                     if let Some(extended) = get_extended(chunks, x, y) {
@@ -125,7 +127,8 @@ pub fn execute_mechanism(
                         &image_assets,
                         query,
                         propagation_queue,
-                        calculations
+                        calculations,
+                        texture_to_block_map
                     );
                     listeners.update_entity(x, y);
                 } else {
@@ -173,7 +176,8 @@ pub fn execute_mechanism(
                         propagation_queue,
                         calculations,
                         &mut traversed,
-                        pull_dir
+                        pull_dir,
+                        texture_to_block_map
                     );
                 }
                 if let Some(movable) = get_movable(chunks, x, y) {
@@ -332,7 +336,8 @@ fn move_blocks(
                 &image_assets,
                 query,
                 propagation_queue,
-                calculations
+                calculations,
+                texture_to_block_map
             )
         {
             destroy(
@@ -372,7 +377,8 @@ fn move_blocks(
                         propagation_queue,
                         calculations,
                         traversed,
-                        neighbor_orientation.get_opposing()
+                        neighbor_orientation.get_opposing(),
+                        texture_to_block_map
                     );
                 }
             }
