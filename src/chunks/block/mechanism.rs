@@ -237,7 +237,12 @@ pub fn execute_mechanism(
             }
         }
         MechanismKind::Observer => {
-            if on {
+            let signal = if let Some(Redstone { signal, .. }) = redstone {
+                signal
+            } else {
+                return;
+            };
+            if on && signal <= 0{
                 propagate_signal_at(
                     chunks,
                     x,
