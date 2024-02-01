@@ -279,7 +279,8 @@ fn move_blocks(
     propagation_queue: &mut PropagationQueue,
     calculations: &mut u32,
     traversed: &mut HashSet<(i128, i128)>,
-    from: Orientation
+    from: Orientation,
+    texture_to_block_map: &HashMap<TextureName, Block>
 ) -> bool {
     let maybe_blk = chunks.get_block(x, y);
     let blk = if let Some(blk) = maybe_blk {
@@ -314,11 +315,12 @@ fn move_blocks(
         propagation_queue,
         calculations,
         traversed,
-        orientation.get_opposing()
+        orientation.get_opposing(),
+        texture_to_block_map,
     );
 
     if moved {
-        if
+        if 
             place(
                 chunks,
                 blk,
