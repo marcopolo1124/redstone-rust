@@ -546,9 +546,10 @@ fn update_tick(
     mut fast: ResMut<Fast>
 ) {
     let tick_rates = [SLOW_TICK, TICK, FAST_TICK];
-    if keyboard_input.pressed(KeyCode::E) {
+    if keyboard_input.just_pressed(KeyCode::E) {
         fast.0 = (fast.0 + 1) % 3;
         let current_rate = tick_rates[fast.0 as usize];
+        println!("{current_rate}");
         let mutable = time.as_mut();
         *mutable = Time::from_seconds(current_rate);
     }
@@ -911,7 +912,7 @@ fn execute_listeners(
     let redstone_component_listener = listeners.redstone_component_listener.clone();
     listeners.redstone_component_listener.clear();
     if redstone_component_listener.len() > 0 {
-        println!("redstone comp {:?}", redstone_component_listener);
+        // println!("redstone comp {:?}", redstone_component_listener);
     }
     
     for ((x, y), on) in redstone_component_listener {

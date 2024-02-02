@@ -250,14 +250,7 @@ pub fn destroy(
                     let output_port_orientation = Orientation::port_idx_to_orientation(idx);
                     let (next_x, next_y) = output_port_orientation.get_next_coord(x, y);
                     let input_port_orientation = output_port_orientation.get_opposing();
-                    // propagation_queue.append(
-                    //     next_x,
-                    //     next_y,
-                    //     0,
-                    //     Some(input_port_orientation),
-                    //     curr_signal,
-                    //     curr_signal_type
-                    // );
+
                     propagate_signal_at(
                         chunks,
                         next_x,
