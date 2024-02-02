@@ -135,7 +135,7 @@ pub fn execute_mechanism(
                     if let Some(movable) = get_movable(chunks, x, y) {
                         *movable = true;
                     }
-                    listeners.turn_mechanism_on(x, y);
+                    listeners.turn_mechanism_on(x, y, false);
                 }
             } else if *extended && !on {
                 *extended = false;
@@ -201,9 +201,9 @@ pub fn execute_mechanism(
             if *countdown > 0 {
                 *countdown -= 1;
                 if on {
-                    listeners.turn_mechanism_on(x, y);
+                    listeners.turn_mechanism_on(x, y, false);
                 } else {
-                    listeners.turn_mechanism_off(x, y);
+                    listeners.turn_mechanism_off(x, y, false);
                 }
             } else if *countdown == 0 {
                 *countdown -= 1;
@@ -256,7 +256,7 @@ pub fn execute_mechanism(
                     calculations
                 );
 
-                listeners.turn_mechanism_off(x, y);
+                listeners.turn_mechanism_off(x, y, false);
             } else {
                 propagate_signal_at(
                     chunks,

@@ -30,6 +30,7 @@ pub struct EventListeners {
     pub entity_map_update: HashSet<(i128, i128)>,
     pub mechanism_listener: HashMap<(i128, i128), bool>,
     pub repropagation_listener: HashSet<(i128, i128)>,
+    pub redstone_component_listener: HashMap<(i128, i128), bool>,
 }
 
 impl EventListeners {
@@ -38,6 +39,7 @@ impl EventListeners {
             entity_map_update: HashSet::new(),
             mechanism_listener: HashMap::new(),
             repropagation_listener: HashSet::new(),
+            redstone_component_listener: HashMap::new(),
         }
     }
 
@@ -45,12 +47,20 @@ impl EventListeners {
         self.entity_map_update.insert((x, y));
     }
 
-    pub fn turn_mechanism_on(&mut self, x: i128, y: i128) {
-        self.mechanism_listener.insert((x, y), true);
+    pub fn turn_mechanism_on(&mut self, x: i128, y: i128, is_redstone: bool) {
+        if is_redstone {
+            self.redstone_component_listener.insert((x, y), true);
+        } else {
+            self.mechanism_listener.insert((x, y), true);
+        }
     }
 
-    pub fn turn_mechanism_off(&mut self, x: i128, y: i128) {
-        self.mechanism_listener.insert((x, y), false);
+    pub fn turn_mechanism_off(&mut self, x: i128, y: i128, is_redstone: bool) {
+        if is_redstone {
+            self.redstone_component_listener.insert((x, y), false);
+        } else {
+            self.mechanism_listener.insert((x, y), false);
+        }
     }
     pub fn remove_mechanism(&mut self, x: i128, y: i128) {
         self.mechanism_listener.remove(&(x, y));
@@ -71,7 +81,7 @@ impl EventListeners {
         };
 
         if from_port == orientation.get_opposing() {
-            self.turn_mechanism_on(x, y)
+            self.turn_mechanism_on(x, y, false)
         }
     }
 }
@@ -164,7 +174,9 @@ impl PropagationQueue {
     }
 }
 
-const TICK: f64 = 0.1;
+const SLOW_TICK: f64 = 0.5;
+const TICK: f64 = 0.02;
+const FAST_TICK:f64 =  0.001;
 
 #[derive(Resource)]
 pub struct TextureToBlockMap(HashMap<TextureName, Block>);
@@ -201,7 +213,7 @@ fn main() {
         .insert_resource(PropagationQueue(Vec::new()))
         .insert_resource(SelectedBlock(Some(DIRT)))
         .insert_resource(Orientation::Up)
-        .insert_resource(Fast(false))
+        .insert_resource(Fast(1))
         .insert_resource(TextureToBlockMap(all_blocks))
         .insert_resource(
             Persistent::<SaveData>
@@ -223,14 +235,12 @@ fn main() {
         .add_systems(OnEnter(MyStates::InGame), init)
         .add_systems(Update, mouse_pos_update_system.run_if(in_state(MyStates::InGame)))
         .add_systems(FixedUpdate, execute_listeners.run_if(in_state(MyStates::InGame)))
-        // .add_systems(Update, repropagation_listener.run_if(in_state(MyStates::InGame)))
+        .add_systems(Update, delayed_redstone_listeners.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, mouse_input.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, update_selected_block.run_if(in_state(MyStates::InGame)))
-        // .add_systems(Update, update_entity_listener.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, move_camera.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, update_orientation.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, autosave.run_if(in_state(MyStates::InGame)))
-        // .add_systems(Update, execute_listeners.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, zoom_camera.run_if(in_state(MyStates::InGame)))
         .add_systems(Update, update_tick)
         .add_systems(Update, update_cursor_position.run_if(in_state(MyStates::InGame)))
@@ -456,7 +466,9 @@ fn init(
 
                 listeners.update_entity(x, y);
                 if let Some(blk_data) = blk {
-                    let mut blk_clone = *texture_to_block_map.0.get(&blk_data.texture_name).unwrap();
+                    let mut blk_clone = *texture_to_block_map.0
+                        .get(&blk_data.texture_name)
+                        .unwrap();
                     blk_clone.mechanism = blk_data.mechanism;
                     if let Some(Redstone { ref mut signal, .. }) = blk_clone.redstone {
                         *signal = blk_data.redstone.unwrap().signal;
@@ -526,21 +538,19 @@ pub fn update_orientation(
 }
 
 #[derive(Resource)]
-struct Fast(bool);
+struct Fast(u8);
 
 fn update_tick(
     keyboard_input: Res<Input<KeyCode>>,
     mut time: ResMut<Time<Fixed>>,
     mut fast: ResMut<Fast>
 ) {
+    let tick_rates = [SLOW_TICK, TICK, FAST_TICK];
     if keyboard_input.pressed(KeyCode::E) {
-        fast.0 = !fast.0;
+        fast.0 = (fast.0 + 1) % 3;
+        let current_rate = tick_rates[fast.0 as usize];
         let mutable = time.as_mut();
-        if fast.0 {
-            *mutable = Time::from_seconds(0.001);
-        } else {
-            *mutable = Time::from_seconds(TICK);
-        }
+        *mutable = Time::from_seconds(current_rate);
     }
 }
 
@@ -822,16 +832,11 @@ enum MyStates {
     InGame,
 }
 
-fn execute_listeners(
+fn delayed_redstone_listeners(
     mut listeners: ResMut<EventListeners>,
     mut chunks: ResMut<Chunks>,
-    mut commands: Commands,
-    image_assets: Res<ImageAssets>,
-    mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>,
     mut propagation_queue: ResMut<PropagationQueue>,
-    mut updates_timer: ResMut<UpdatesPerSecondTimer>,
-    texture_to_block_map: Res<TextureToBlockMap>
-) {
+){
     let mut calculations = 0;
 
     propagation_queue.execute_queue(&mut chunks, &mut listeners, &mut calculations);
@@ -843,14 +848,14 @@ fn execute_listeners(
     let queue = listeners.repropagation_listener.clone();
     listeners.repropagation_listener.clear();
 
-    for (x, y) in queue {
-        let prev_redstone = get_max_prev(&mut chunks, x, y);
+    for (x, y) in queue.iter() {
+        let prev_redstone = get_max_prev(&mut chunks, *x, *y);
         let (from_port, previous_signal, prev_signal_type) = prev_redstone;
         let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
         propagate_signal_at(
             &mut chunks,
-            x,
-            y,
+            *x,
+            *y,
             from_port,
             transmitted_signal,
             previous_signal,
@@ -860,18 +865,32 @@ fn execute_listeners(
             &mut calculations
         );
     }
+}
 
-    if listeners.repropagation_listener.len() > 0 {
-        return;
+fn execute_listeners(
+    mut listeners: ResMut<EventListeners>,
+    mut chunks: ResMut<Chunks>,
+    mut commands: Commands,
+    image_assets: Res<ImageAssets>,
+    mut query: Query<&mut TextureAtlasSprite, With<BlockComponent>>,
+    mut propagation_queue: ResMut<PropagationQueue>,
+    mut updates_timer: ResMut<UpdatesPerSecondTimer>,
+    texture_to_block_map: Res<TextureToBlockMap>
+) {
+    if !propagation_queue.is_empty(){
+        return
+    }
+
+    if listeners.repropagation_listener.len() > 0{
+        return
     }
 
     let mechanism_listener = listeners.mechanism_listener.clone();
+    if mechanism_listener.len() > 0 {
+        // println!("mechanism listener {:?}", mechanism_listener);
+    }
     listeners.mechanism_listener.clear();
-
-    // if mechanism_listener.len() > 0 {
-    //     println!("{:?}", mechanism_listener);
-    // }
-
+    let mut calculations = 0;
     for ((x, y), on) in mechanism_listener {
         execute_mechanism(
             &mut chunks,
@@ -888,8 +907,30 @@ fn execute_listeners(
         );
     }
 
-    let entity_map_update = listeners.entity_map_update.clone();
+    
+    let redstone_component_listener = listeners.redstone_component_listener.clone();
+    listeners.redstone_component_listener.clear();
+    if redstone_component_listener.len() > 0 {
+        println!("redstone comp {:?}", redstone_component_listener);
+    }
+    
+    for ((x, y), on) in redstone_component_listener {
+        execute_mechanism(
+            &mut chunks,
+            x,
+            y,
+            on,
+            &mut listeners,
+            &mut commands,
+            &image_assets,
+            &mut query,
+            &mut propagation_queue,
+            &mut calculations,
+            &texture_to_block_map.0
+        );
+    }
 
+    let entity_map_update = listeners.entity_map_update.clone();
     for (x, y) in entity_map_update {
         update_entity(&mut commands, &mut chunks, x, y, &image_assets, &mut query);
         alert_neighbours(x, y, &chunks, &mut listeners);

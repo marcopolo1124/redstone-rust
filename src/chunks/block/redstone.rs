@@ -18,9 +18,15 @@ pub fn propagate_signal_at(
 
     let curr_blk = chunks.get_block(x, y);
 
-    let (signal, signal_type, kind, input_ports, output_ports, signal_type_port_mapping) = match
-        *curr_blk
-    {
+    let (
+        signal,
+        signal_type,
+        kind,
+        input_ports,
+        output_ports,
+        signal_type_port_mapping,
+        mechanism,
+    ) = match *curr_blk {
         Some(
             Block {
                 redstone: Some(
@@ -33,9 +39,19 @@ pub fn propagate_signal_at(
                         signal_type_port_mapping,
                     },
                 ),
+                mechanism,
                 ..
             },
-        ) => (signal, signal_type, kind, input_ports, output_ports, signal_type_port_mapping),
+        ) =>
+            (
+                signal,
+                signal_type,
+                kind,
+                input_ports,
+                output_ports,
+                signal_type_port_mapping,
+                mechanism,
+            ),
         _ => {
             return;
         }
@@ -55,11 +71,16 @@ pub fn propagate_signal_at(
                 }
             }
             Some(RedstoneKind::Mechanism) => {
+                let is_redstone = match mechanism {
+                    Some(MechanismKind::RedstoneTorch) | Some(MechanismKind::Repeater { .. }) =>
+                        true,
+                    _ => false,
+                };
                 if input_signal > 0 {
-                    listeners.turn_mechanism_on(x, y);
+                    listeners.turn_mechanism_on(x, y, is_redstone);
                 } else {
-                    // println!("turn off {x} {y}");
-                    listeners.turn_mechanism_off(x, y);
+                    //  println!("turn off {x} {y}");
+                    listeners.turn_mechanism_off(x, y, is_redstone);
                 }
             }
             None => {
@@ -165,7 +186,7 @@ pub fn propagate_signal_at(
             }
         }
     }
-if input_signal == 0 {
+    if input_signal == 0 {
         listeners.repropagate(x, y)
     }
 }
