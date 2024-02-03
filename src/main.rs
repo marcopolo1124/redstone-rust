@@ -388,18 +388,7 @@ const STICKY_PISTON_HEAD: Block = Block {
     mechanism: None,
 };
 
-const PLACEABLE_BOARD: [Block; 10] = [
-    DIRT,
-    REDSTONE_TORCH,
-    REDSTONE_DUST,
-    OBSERVER,
-    LEVER,
-    BUTTON,
-    SLIME,
-    PISTON,
-    STICKY_PISTON,
-    REPEATER
-];
+
 
 fn main() {
     let chunks = Chunks::new();
@@ -409,7 +398,7 @@ fn main() {
         .map(|dir| dir.join("redstone_rust"))
         .unwrap_or(Path::new("local").join("save"));
 
-    let all_blocks = HashMap::from([
+    let mut all_blocks = HashMap::from([
         (TextureName::Dirt, DIRT),
         (TextureName::RedstoneDust, REDSTONE_DUST),
         (TextureName::RedstoneTorch, REDSTONE_TORCH),
@@ -424,11 +413,50 @@ fn main() {
         (TextureName::Lever, LEVER),
     ]);
 
+    let mut placeable: Vec<Block> = vec![
+        DIRT,
+        REDSTONE_TORCH,
+        REDSTONE_DUST,
+        OBSERVER,
+        LEVER,
+        BUTTON,
+        SLIME,
+        PISTON,
+        STICKY_PISTON,
+        REPEATER
+    ];
+
+    let wool_textures = [
+        TextureName::BlackWool,
+        TextureName::BlueWool,
+        TextureName::BrownWool,
+        TextureName::CyanWool,
+        TextureName::GrayWool,
+        TextureName::GreenWool,
+        TextureName::LightBlueWool,
+        TextureName::LightGrayWool,
+        TextureName::LimeWool,
+        TextureName::MagentaWool,
+        TextureName::OrangeWool,
+        TextureName::PinkWool,
+        TextureName::PurpleWool,
+        TextureName::RedWool,
+        TextureName::WhiteWool,
+        TextureName::YellowWool,
+    ];
+
+    for wool in wool_textures{
+        let mut wool_blk = DIRT.clone();
+        wool_blk.texture_name = wool;
+        placeable.push(wool_blk);
+        all_blocks.insert(wool, wool_blk);
+    }
+
     let mut default_save = Vec::new();
     let start_x = 0;
     let start_y = 0;
 
-    for (idx, blk) in PLACEABLE_BOARD.iter().enumerate() {
+    for (idx, blk) in placeable.iter().enumerate() {
         default_save.push(((start_x as i128, start_y + idx as i128), *blk));
     }
 
