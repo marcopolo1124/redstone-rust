@@ -239,7 +239,7 @@ const BUTTON: Block = Block {
     sticky: false,
     orientation: Orientation::Up,
     texture_name: TextureName::Button,
-    symmetric: false,
+    symmetric: true,
     redstone: Some(Redstone {
         signal: 0,
         signal_type: Some(SignalType::Strong(true)),
@@ -261,7 +261,7 @@ const LEVER: Block = Block {
     sticky: false,
     orientation: Orientation::Up,
     texture_name: TextureName::Lever,
-    symmetric: false,
+    symmetric: true,
     redstone: Some(Redstone {
         signal: 0,
         signal_type: Some(SignalType::Strong(true)),
