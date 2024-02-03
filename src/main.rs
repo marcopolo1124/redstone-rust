@@ -97,7 +97,8 @@ impl SelectedBlock {
 
 #[derive(Resource, Serialize, Deserialize)]
 struct SaveData(
-    Vec<((i128, i128), [[Option<Block>; CHUNK_SIZE.0 as usize]; CHUNK_SIZE.1 as usize])>,
+    // Vec<((i128, i128), [[Option<Block>; CHUNK_SIZE.0 as usize]; CHUNK_SIZE.1 as usize])>,
+    Vec<((i128, i128), Block)>,
 );
 
 #[derive(Resource)]
@@ -176,7 +177,7 @@ impl PropagationQueue {
 
 const SLOW_TICK: f64 = 0.5;
 const TICK: f64 = 0.02;
-const FAST_TICK:f64 =  0.001;
+const FAST_TICK: f64 = 0.001;
 
 #[derive(Resource)]
 pub struct TextureToBlockMap(HashMap<TextureName, Block>);
@@ -200,6 +201,8 @@ fn main() {
         (TextureName::StickyPistonHead, STICKY_PISTON_HEAD),
         (TextureName::Repeater, REPEATER),
         (TextureName::SlimeBlock, SLIME),
+        (TextureName::Button, BUTTON),
+        (TextureName::Lever, LEVER)
     ]);
 
     App::new()
@@ -302,6 +305,50 @@ const REDSTONE_TORCH: Block = Block {
         output_ports: [true, true, false, true],
     }),
     mechanism: Some(MechanismKind::RedstoneTorch),
+};
+
+const BUTTON: Block = Block {
+    movable: false,
+    sticky: false,
+    orientation: Orientation::Up,
+    texture_name: TextureName::Button,
+    symmetric: false,
+    redstone: Some(Redstone {
+        signal: 0,
+        signal_type: Some(SignalType::Strong(true)),
+        kind: Some(RedstoneKind::Mechanism),
+        signal_type_port_mapping: [
+            Some(SignalType::Strong(true)),
+            Some(SignalType::Strong(true)),
+            Some(SignalType::Strong(true)),
+            Some(SignalType::Strong(false)),
+        ],
+        input_ports: [false, false, false, false],
+        output_ports: [true, true, true, true],
+    }),
+    mechanism: Some(MechanismKind::Button),
+};
+
+const LEVER: Block = Block {
+    movable: false,
+    sticky: false,
+    orientation: Orientation::Up,
+    texture_name: TextureName::Lever,
+    symmetric: false,
+    redstone: Some(Redstone {
+        signal: 0,
+        signal_type: Some(SignalType::Strong(true)),
+        kind: Some(RedstoneKind::Mechanism),
+        signal_type_port_mapping: [
+            Some(SignalType::Strong(true)),
+            Some(SignalType::Strong(true)),
+            Some(SignalType::Strong(true)),
+            Some(SignalType::Strong(false)),
+        ],
+        input_ports: [false, false, false, false],
+        output_ports: [true, true, true, true],
+    }),
+    mechanism: Some(MechanismKind::Lever),
 };
 
 const REPEATER: Block = Block {
@@ -457,39 +504,21 @@ fn init(
     ));
 
     let mut calculations = 0;
-
-    for ((chunk_x, chunk_y), map) in save_data.0.iter() {
-        for (u, row) in map.iter().enumerate() {
-            for (v, blk) in row.iter().enumerate() {
-                let x = chunk_x * CHUNK_SIZE.0 + (u as i128);
-                let y = chunk_y * CHUNK_SIZE.1 + (v as i128);
-
-                listeners.update_entity(x, y);
-                if let Some(blk_data) = blk {
-                    let mut blk_clone = *texture_to_block_map.0
-                        .get(&blk_data.texture_name)
-                        .unwrap();
-                    blk_clone.mechanism = blk_data.mechanism;
-                    if let Some(Redstone { ref mut signal, .. }) = blk_clone.redstone {
-                        *signal = blk_data.redstone.unwrap().signal;
-                    }
-                    place(
-                        &mut chunks,
-                        blk_clone,
-                        blk_data.orientation,
-                        x,
-                        y,
-                        &mut listeners,
-                        &mut commands,
-                        &image_assets,
-                        &mut query,
-                        &mut propagation_queue,
-                        &mut calculations,
-                        &texture_to_block_map.0
-                    );
-                }
-            }
-        }
+    for ((x, y), blk) in save_data.0.iter() {
+        place(
+            &mut chunks,
+            *blk,
+            blk.orientation,
+            *x,
+            *y,
+            &mut listeners,
+            &mut commands,
+            &image_assets,
+            &mut query,
+            &mut propagation_queue,
+            &mut calculations,
+            &texture_to_block_map.0
+        );
     }
 }
 
@@ -516,7 +545,11 @@ pub fn update_selected_block(
         selected.0 = Some(OBSERVER);
     } else if keyboard_input.pressed(KeyCode::Key8) {
         selected.0 = Some(SLIME);
-    }
+    } else if keyboard_input.pressed(KeyCode::Key9) {
+        selected.0 = Some(BUTTON)
+    } else if keyboard_input.pressed(KeyCode::Key0) {
+        selected.0 = Some(LEVER)
+    } 
 }
 
 pub fn update_orientation(
@@ -713,7 +746,9 @@ fn get_state(blk: Block) -> usize {
         }
         Block {
             redstone: Some(Redstone { signal, kind: Some(RedstoneKind::Mechanism), .. }),
-            mechanism: Some(MechanismKind::RedstoneTorch),
+            mechanism: Some(MechanismKind::RedstoneTorch)
+            | Some(MechanismKind::Button)
+            | Some(MechanismKind::Lever),
             ..
         } => {
             if signal > 0 { 1 } else { 0 }
@@ -836,8 +871,8 @@ enum MyStates {
 fn delayed_redstone_listeners(
     mut listeners: ResMut<EventListeners>,
     mut chunks: ResMut<Chunks>,
-    mut propagation_queue: ResMut<PropagationQueue>,
-){
+    mut propagation_queue: ResMut<PropagationQueue>
+) {
     let mut calculations = 0;
 
     propagation_queue.execute_queue(&mut chunks, &mut listeners, &mut calculations);
@@ -878,12 +913,12 @@ fn execute_listeners(
     mut updates_timer: ResMut<UpdatesPerSecondTimer>,
     texture_to_block_map: Res<TextureToBlockMap>
 ) {
-    if !propagation_queue.is_empty(){
-        return
+    if !propagation_queue.is_empty() {
+        return;
     }
 
-    if listeners.repropagation_listener.len() > 0{
-        return
+    if listeners.repropagation_listener.len() > 0 {
+        return;
     }
 
     let mechanism_listener = listeners.mechanism_listener.clone();
@@ -908,13 +943,12 @@ fn execute_listeners(
         );
     }
 
-    
     let redstone_component_listener = listeners.redstone_component_listener.clone();
     listeners.redstone_component_listener.clear();
     if redstone_component_listener.len() > 0 {
         // println!("redstone comp {:?}", redstone_component_listener);
     }
-    
+
     for ((x, y), on) in redstone_component_listener {
         execute_mechanism(
             &mut chunks,
@@ -953,6 +987,9 @@ fn interact(
     match blk {
         Some(Block { mechanism: Some(MechanismKind::Repeater { tick, .. }), .. }) => {
             *tick = (*tick + 1) % 4;
+        },
+        Some(Block {mechanism: Some(MechanismKind::Button) | Some(MechanismKind::Lever), ..}) => {
+            listeners.turn_mechanism_on(x, y, true)
         }
         _ => {}
     }
@@ -969,12 +1006,19 @@ fn autosave(
     autosave.timer.tick(time.delta());
     if autosave.timer.finished() {
         let mut current_state = Vec::new();
-        for ((x, y), chunk) in chunks.0.iter() {
-            let tuple = ((*x, *y), chunk.map.clone());
-            current_state.push(tuple);
+        for ((chunk_x, chunk_y), chunk) in chunks.0.iter() {
+            for (u, row) in chunk.map.iter().enumerate() {
+                for (v, blk) in row.iter().enumerate() {
+                    let x = chunk_x * CHUNK_SIZE.0 + (u as i128);
+                    let y = chunk_y * CHUNK_SIZE.1 + (v as i128);
+                    if let Some(blk) = *blk {
+                        let tuple = ((x, y), blk);
+                        current_state.push(tuple);
+                    }
+                }
+            }
         }
         save_data.0 = current_state;
-
         save_data.persist().ok();
     }
 }

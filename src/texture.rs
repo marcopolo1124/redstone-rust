@@ -10,6 +10,16 @@ pub struct ImageAssets {
     redstone_torch: Handle<TextureAtlas>,
 
     #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 2, rows = 1))]
+    #[asset(path = "images/button.png")]
+    #[asset(image(sampler = nearest))]
+    button: Handle<TextureAtlas>,
+
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 2, rows = 1))]
+    #[asset(path = "images/lever.png")]
+    #[asset(image(sampler = nearest))]
+    lever: Handle<TextureAtlas>,
+
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 2, rows = 1))]
     #[asset(path = "images/observer.png")]
     #[asset(image(sampler = nearest))]
     observer: Handle<TextureAtlas>,
@@ -73,6 +83,8 @@ pub fn get_atlas(texture_name: TextureName, image_assets: &ImageAssets) -> Handl
         TextureName::Repeater => image_assets.repeater.clone(),
         TextureName::Observer => image_assets.observer.clone(),
         TextureName::SlimeBlock => image_assets.slime_block.clone(),
+        TextureName::Button => image_assets.button.clone(),
+        TextureName::Lever => image_assets.lever.clone()
     }
 }
 
@@ -88,5 +100,7 @@ pub enum TextureName {
     StickyPistonHead,
     Repeater,
     Observer,
-    SlimeBlock
+    SlimeBlock,
+    Button,
+    Lever
 }

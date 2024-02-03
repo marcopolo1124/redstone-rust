@@ -271,6 +271,75 @@ pub fn execute_mechanism(
                     calculations
                 );
             }
+        },
+        MechanismKind::Lever => {
+            let signal = if let Some(Redstone { signal, .. }) = redstone {
+                signal
+            } else {
+                return;
+            };
+            if signal > 0 {
+                propagate_signal_at(
+                    chunks,
+                    x,
+                    y,
+                    None,
+                    0,
+                    17,
+                    None,
+                    listeners,
+                    propagation_queue,
+                    calculations
+                )
+            } else {
+                propagate_signal_at(
+                    chunks,
+                    x,
+                    y,
+                    None,
+                    16,
+                    16,
+                    None,
+                    listeners,
+                    propagation_queue,
+                    calculations
+                )
+            }
+        },
+        MechanismKind::Button => {
+            let signal = if let Some(Redstone { signal, .. }) = redstone {
+                signal
+            } else {
+                return;
+            };
+            if signal > 0 {
+                propagate_signal_at(
+                    chunks,
+                    x,
+                    y,
+                    None,
+                    0,
+                    17,
+                    None,
+                    listeners,
+                    propagation_queue,
+                    calculations
+                )
+            } else {
+                propagate_signal_at(
+                    chunks,
+                    x,
+                    y,
+                    None,
+                    16,
+                    16,
+                    None,
+                    listeners,
+                    propagation_queue,
+                    calculations
+                );
+                listeners.turn_mechanism_off(x, y, true)
+            }
         }
     }
 }
