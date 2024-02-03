@@ -296,7 +296,7 @@ const REPEATER: Block = Block {
 };
 
 const OBSERVER: Block = Block {
-    movable: false,
+    movable: true,
     sticky: false,
     orientation: Orientation::Up,
     texture_name: TextureName::Observer,
