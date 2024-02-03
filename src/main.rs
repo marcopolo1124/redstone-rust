@@ -96,10 +96,7 @@ impl SelectedBlock {
 }
 
 #[derive(Resource, Serialize, Deserialize)]
-struct SaveData(
-    // Vec<((i128, i128), [[Option<Block>; CHUNK_SIZE.0 as usize]; CHUNK_SIZE.1 as usize])>,
-    Vec<((i128, i128), Block)>,
-);
+struct SaveData(Vec<((i128, i128), Block)>);
 
 #[derive(Resource)]
 struct AutosaveTimer {
@@ -181,76 +178,6 @@ const FAST_TICK: f64 = 0.001;
 
 #[derive(Resource)]
 pub struct TextureToBlockMap(HashMap<TextureName, Block>);
-
-fn main() {
-    let chunks = Chunks::new();
-    let event_listeners = EventListeners::new();
-    let state_dir = dirs
-        ::config_dir()
-        .map(|dir| dir.join("redstone_rust"))
-        .unwrap_or(Path::new("local").join("save"));
-
-    let all_blocks = HashMap::from([
-        (TextureName::Dirt, DIRT),
-        (TextureName::RedstoneDust, REDSTONE_DUST),
-        (TextureName::RedstoneTorch, REDSTONE_TORCH),
-        (TextureName::Observer, OBSERVER),
-        (TextureName::Piston, PISTON),
-        (TextureName::PistonHead, PISTON_HEAD),
-        (TextureName::StickyPiston, STICKY_PISTON),
-        (TextureName::StickyPistonHead, STICKY_PISTON_HEAD),
-        (TextureName::Repeater, REPEATER),
-        (TextureName::SlimeBlock, SLIME),
-        (TextureName::Button, BUTTON),
-        (TextureName::Lever, LEVER)
-    ]);
-
-    App::new()
-        .add_state::<MyStates>()
-        .add_plugins(FrameTimeDiagnosticsPlugin::default())
-        .insert_resource(Time::<Fixed>::from_seconds(TICK))
-        .add_plugins(DefaultPlugins)
-        .insert_resource(Msaa::Off)
-        .insert_resource(chunks)
-        .insert_resource(event_listeners)
-        .insert_resource(PropagationQueue(Vec::new()))
-        .insert_resource(SelectedBlock(Some(DIRT)))
-        .insert_resource(Orientation::Up)
-        .insert_resource(Fast(1))
-        .insert_resource(TextureToBlockMap(all_blocks))
-        .insert_resource(
-            Persistent::<SaveData>
-                ::builder()
-                .name("save data")
-                .format(StorageFormat::Json)
-                .path(state_dir.join("save_data.json"))
-                .default(SaveData(Vec::new()))
-                .build()
-                .expect("failed to initialize game state")
-        )
-        .add_loading_state(
-            LoadingState::new(MyStates::AssetLoading)
-                .continue_to_state(MyStates::InGame)
-                .load_collection::<ImageAssets>()
-        )
-        .add_systems(Startup, setup_fps_counter)
-        .add_systems(Update, (fps_text_update_system, fps_counter_showhide))
-        .add_systems(OnEnter(MyStates::InGame), init)
-        .add_systems(Update, mouse_pos_update_system.run_if(in_state(MyStates::InGame)))
-        .add_systems(FixedUpdate, execute_listeners.run_if(in_state(MyStates::InGame)))
-        .add_systems(Update, delayed_redstone_listeners.run_if(in_state(MyStates::InGame)))
-        .add_systems(Update, mouse_input.run_if(in_state(MyStates::InGame)))
-        .add_systems(Update, update_selected_block.run_if(in_state(MyStates::InGame)))
-        .add_systems(Update, move_camera.run_if(in_state(MyStates::InGame)))
-        .add_systems(Update, update_orientation.run_if(in_state(MyStates::InGame)))
-        .add_systems(Update, autosave.run_if(in_state(MyStates::InGame)))
-        .add_systems(Update, zoom_camera.run_if(in_state(MyStates::InGame)))
-        .add_systems(Update, update_tick)
-        .add_systems(Update, update_cursor_position.run_if(in_state(MyStates::InGame)))
-        .add_systems(Update, update_tps_text.run_if(in_state(MyStates::InGame)))
-        .run()
-}
-
 const DIRT: Block = Block {
     movable: true,
     sticky: false,
@@ -461,6 +388,96 @@ const STICKY_PISTON_HEAD: Block = Block {
     mechanism: None,
 };
 
+const PLACEABLE_BOARD: [Block; 10] = [
+    DIRT,
+    REDSTONE_TORCH,
+    REDSTONE_DUST,
+    OBSERVER,
+    LEVER,
+    BUTTON,
+    SLIME,
+    PISTON,
+    STICKY_PISTON,
+    REPEATER
+];
+
+fn main() {
+    let chunks = Chunks::new();
+    let event_listeners = EventListeners::new();
+    let state_dir = dirs
+        ::config_dir()
+        .map(|dir| dir.join("redstone_rust"))
+        .unwrap_or(Path::new("local").join("save"));
+
+    let all_blocks = HashMap::from([
+        (TextureName::Dirt, DIRT),
+        (TextureName::RedstoneDust, REDSTONE_DUST),
+        (TextureName::RedstoneTorch, REDSTONE_TORCH),
+        (TextureName::Observer, OBSERVER),
+        (TextureName::Piston, PISTON),
+        (TextureName::PistonHead, PISTON_HEAD),
+        (TextureName::StickyPiston, STICKY_PISTON),
+        (TextureName::StickyPistonHead, STICKY_PISTON_HEAD),
+        (TextureName::Repeater, REPEATER),
+        (TextureName::SlimeBlock, SLIME),
+        (TextureName::Button, BUTTON),
+        (TextureName::Lever, LEVER),
+    ]);
+
+    let mut default_save = Vec::new();
+    let start_x = 0;
+    let start_y = 0;
+
+    for (idx, blk) in PLACEABLE_BOARD.iter().enumerate() {
+        default_save.push(((start_x as i128, start_y + idx as i128), *blk));
+    }
+
+    App::new()
+        .add_state::<MyStates>()
+        .add_plugins(FrameTimeDiagnosticsPlugin::default())
+        .insert_resource(Time::<Fixed>::from_seconds(TICK))
+        .add_plugins(DefaultPlugins)
+        .insert_resource(Msaa::Off)
+        .insert_resource(chunks)
+        .insert_resource(event_listeners)
+        .insert_resource(PropagationQueue(Vec::new()))
+        .insert_resource(SelectedBlock(Some(DIRT)))
+        .insert_resource(Orientation::Up)
+        .insert_resource(Fast(1))
+        .insert_resource(TextureToBlockMap(all_blocks))
+        .insert_resource(
+            Persistent::<SaveData>
+                ::builder()
+                .name("save data")
+                .format(StorageFormat::Json)
+                .path(state_dir.join("save_data.json"))
+                .default(SaveData(default_save))
+                .build()
+                .expect("failed to initialize game state")
+        )
+        .add_loading_state(
+            LoadingState::new(MyStates::AssetLoading)
+                .continue_to_state(MyStates::InGame)
+                .load_collection::<ImageAssets>()
+        )
+        .add_systems(Startup, setup_fps_counter)
+        .add_systems(Update, (fps_text_update_system, fps_counter_showhide))
+        .add_systems(OnEnter(MyStates::InGame), init)
+        .add_systems(Update, mouse_pos_update_system.run_if(in_state(MyStates::InGame)))
+        .add_systems(FixedUpdate, execute_listeners.run_if(in_state(MyStates::InGame)))
+        .add_systems(Update, delayed_redstone_listeners.run_if(in_state(MyStates::InGame)))
+        .add_systems(Update, mouse_input.run_if(in_state(MyStates::InGame)))
+        .add_systems(Update, update_selected_block.run_if(in_state(MyStates::InGame)))
+        .add_systems(Update, move_camera.run_if(in_state(MyStates::InGame)))
+        .add_systems(Update, update_orientation.run_if(in_state(MyStates::InGame)))
+        .add_systems(Update, autosave.run_if(in_state(MyStates::InGame)))
+        .add_systems(Update, zoom_camera.run_if(in_state(MyStates::InGame)))
+        .add_systems(Update, update_tick)
+        .add_systems(Update, update_cursor_position.run_if(in_state(MyStates::InGame)))
+        .add_systems(Update, update_tps_text.run_if(in_state(MyStates::InGame)))
+        .run()
+}
+
 const AUTOSAVE_INTERVAL_SECONDS: f32 = 3.0;
 const UPDATES_TIMER_INTERVAL_SECONDS: f32 = 5.0;
 
@@ -475,6 +492,7 @@ fn init(
     texture_to_block_map: Res<TextureToBlockMap>
 ) {
     commands.spawn(Camera2dBundle {
+        transform: Transform::from_xyz(BOX_WIDTH * 5.0, BOX_WIDTH * 20.0, 0.),
         ..default()
     });
 
@@ -546,10 +564,10 @@ pub fn update_selected_block(
     } else if keyboard_input.pressed(KeyCode::Key8) {
         selected.0 = Some(SLIME);
     } else if keyboard_input.pressed(KeyCode::Key9) {
-        selected.0 = Some(BUTTON)
+        selected.0 = Some(BUTTON);
     } else if keyboard_input.pressed(KeyCode::Key0) {
-        selected.0 = Some(LEVER)
-    } 
+        selected.0 = Some(LEVER);
+    }
 }
 
 pub fn update_orientation(
@@ -987,9 +1005,9 @@ fn interact(
     match blk {
         Some(Block { mechanism: Some(MechanismKind::Repeater { tick, .. }), .. }) => {
             *tick = (*tick + 1) % 4;
-        },
-        Some(Block {mechanism: Some(MechanismKind::Button) | Some(MechanismKind::Lever), ..}) => {
-            listeners.turn_mechanism_on(x, y, true)
+        }
+        Some(Block { mechanism: Some(MechanismKind::Button) | Some(MechanismKind::Lever), .. }) => {
+            listeners.turn_mechanism_on(x, y, true);
         }
         _ => {}
     }
