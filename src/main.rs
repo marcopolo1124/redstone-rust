@@ -295,6 +295,23 @@ const REPEATER: Block = Block {
     mechanism: Some(MechanismKind::Repeater { countdown: -1, tick: 0 }),
 };
 
+const COMPARATOR: Block = Block {
+    movable: false,
+    sticky: false,
+    orientation: Orientation::Up,
+    texture_name: TextureName::Comparator,
+    symmetric: false,
+    redstone: Some(Redstone {
+        signal: 0,
+        signal_type_port_mapping: [Some(SignalType::Strong(true)), None, None, None],
+        signal_type: Some(SignalType::Strong(true)),
+        kind: Some(RedstoneKind::Mechanism),
+        input_ports: [false, true, true, true],
+        output_ports: [true, false, false, false],
+    }),
+    mechanism: Some(MechanismKind::Comparator { mode: ComparatorModes::Subtract }),
+};
+
 const OBSERVER: Block = Block {
     movable: true,
     sticky: false,
@@ -411,6 +428,7 @@ fn main() {
         (TextureName::SlimeBlock, SLIME),
         (TextureName::Button, BUTTON),
         (TextureName::Lever, LEVER),
+        (TextureName::Comparator, COMPARATOR)
     ]);
 
     let mut placeable: Vec<Block> = vec![
@@ -423,7 +441,8 @@ fn main() {
         SLIME,
         PISTON,
         STICKY_PISTON,
-        REPEATER
+        REPEATER,
+        COMPARATOR
     ];
 
     let wool_textures = [
@@ -576,7 +595,7 @@ pub fn update_selected_block(
     keyboard_input: Res<Input<KeyCode>>
 ) {
     if keyboard_input.pressed(KeyCode::Key1) {
-        selected.0 = Some(DIRT);
+        selected.0 = Some(COMPARATOR);
     } else if keyboard_input.pressed(KeyCode::Key2) {
         selected.0 = Some(REDSTONE_TORCH);
     } else if keyboard_input.pressed(KeyCode::Key3) {
@@ -813,6 +832,19 @@ fn get_state(blk: Block) -> usize {
         }
         Block {
             redstone: Some(Redstone { signal, .. }),
+            mechanism: Some(MechanismKind::Comparator { mode }),
+            ..
+        } => {
+            let col_ind = if signal > 0 { 1 } else { 0 };
+            let row_ind = if mode == ComparatorModes::Compare {
+                0
+            } else{
+                1
+            };
+            (row_ind * 2 + col_ind) as usize
+        }
+        Block {
+            redstone: Some(Redstone { signal, .. }),
             mechanism: Some(MechanismKind::Observer),
             ..
         } => {
@@ -1035,6 +1067,14 @@ fn interact(
             *tick = (*tick + 1) % 4;
         }
         Some(Block { mechanism: Some(MechanismKind::Button) | Some(MechanismKind::Lever), .. }) => {
+            listeners.turn_mechanism_on(x, y, true);
+        }
+        Some(Block { mechanism: Some(MechanismKind::Comparator { mode }), .. }) => {
+            if *mode == ComparatorModes::Compare{
+                *mode = ComparatorModes::Subtract
+            } else{
+                *mode = ComparatorModes::Compare
+            }
             listeners.turn_mechanism_on(x, y, true);
         }
         _ => {}

@@ -186,7 +186,7 @@ pub fn propagate_signal_at(
             }
         }
     }
-    if input_signal == 0 {
+    if input_signal == 0 && prev_signal_type != None{
         listeners.repropagate(x, y)
     }
 }

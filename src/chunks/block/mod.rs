@@ -38,7 +38,14 @@ pub enum MechanismKind {
     },
     Observer,
     Lever,
-    Button
+    Button,
+    Comparator{mode: ComparatorModes}
+}
+
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
+pub enum ComparatorModes{
+    Subtract,
+    Compare
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]

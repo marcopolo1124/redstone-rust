@@ -340,6 +340,87 @@ pub fn execute_mechanism(
                 );
                 listeners.turn_mechanism_off(x, y, true)
             }
+        },
+
+        MechanismKind::Comparator{mode} => {
+            let mode = *mode;
+            let rs = if let Some(rs) = redstone {
+                rs
+            } else {
+                return
+            };
+            let rear_port = orientation.get_opposing();
+            let rear_power = {
+                
+                let (rear_x, rear_y) = rear_port.get_next_coord(x, y);
+                if let Some(Block{redstone: Some(Redstone{signal, ..}), ..}) = chunks.get_block_ref(rear_x, rear_y){
+                    *signal
+                } else{
+                    0
+                }
+            };
+
+            let signal = match mode{
+                ComparatorModes::Compare => {
+                    let (_, max_prev, _) = get_max_prev(chunks, x, y);
+                    if rear_power >= max_prev {
+                        rear_power
+                    } else {
+                        0
+                    }
+                }
+                ComparatorModes::Subtract => {
+                    let mut max_side_signal = 0;
+                    for (idx, port) in rs.input_ports.iter().enumerate(){
+                        let side_port = Orientation::port_idx_to_orientation(idx);
+                        if *port && side_port != rear_port{
+                            let (side_x, side_y) = side_port.get_next_coord(x, y);
+                            let side_signal = if let Some(Block{redstone: Some(Redstone{signal, ..}), ..}) = chunks.get_block_ref(side_x, side_y){
+                                *signal
+                            } else{
+                                0
+                            };
+
+                            if side_signal > max_side_signal{
+                                max_side_signal = side_signal
+                            }
+                        }
+                    };
+
+                    if rear_power >= max_side_signal {
+                        rear_power - max_side_signal
+                    } else{
+                        0
+                    }
+                }
+
+                
+            };
+
+            propagate_signal_at(
+                chunks,
+                x,
+                y,
+                None,
+                0,
+                rs.signal + 1,
+                None,
+                listeners,
+                propagation_queue,
+                calculations
+            );
+            propagate_signal_at(
+                chunks,
+                x,
+                y,
+                None,
+                signal,
+                rs.signal + 1,
+                None,
+                listeners,
+                propagation_queue,
+                calculations
+            )
         }
     }
 }
