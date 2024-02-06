@@ -359,7 +359,7 @@ const PISTON: Block = Block {
     symmetric: false,
     redstone: Some(Redstone {
         signal: 0,
-        signal_type: None,
+        signal_type: Some(SignalType::Weak(true)),
         signal_type_port_mapping: [None, None, None, None],
         kind: Some(RedstoneKind::Mechanism),
         input_ports: [false, true, true, true],
@@ -386,7 +386,7 @@ const STICKY_PISTON: Block = Block {
     symmetric: false,
     redstone: Some(Redstone {
         signal: 0,
-        signal_type: None,
+        signal_type: Some(SignalType::Weak(true)),
         signal_type_port_mapping: [None, None, None, None],
         kind: Some(RedstoneKind::Mechanism),
         input_ports: [false, true, true, true],
