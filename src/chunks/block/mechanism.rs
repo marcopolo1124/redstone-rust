@@ -35,18 +35,18 @@ pub fn execute_mechanism(
     calculations: &mut u32,
     texture_to_block_map: &HashMap<TextureName, Block>
 ) {
-    let maybe_blk = chunks.get_block(x, y);
+        let maybe_blk = chunks.get_block(x, y);
     let blk = if let Some(blk) = maybe_blk {
         blk
     } else {
-        return;
+                return;
     };
 
     let Block { orientation, mechanism, redstone, movable, .. } = blk;
     let mechanism_kind = if let Some(mechanism_kind) = mechanism {
         mechanism_kind
     } else {
-        return;
+                return;
     };
 
     let orientation = *orientation;
@@ -88,11 +88,16 @@ pub fn execute_mechanism(
             }
         }
         MechanismKind::Piston { ref mut extended, sticky } => {
+            let rs = if let Some(rs) = redstone{
+                rs
+            } else{
+                return
+            };
             let is_sticky = *sticky;
             let piston_head = if is_sticky { STICKY_PISTON_HEAD } else { PISTON_HEAD };
             let mut traversed = HashSet::new();
             *movable = false;
-            if !*extended && on {
+            if rs.signal > 0 && !*extended {
                 let (next_x, next_y) = orientation.get_next_coord(x, y);
                 let affected_blocks = get_power(chunks, next_x, next_y, orientation, 12);
                 let moved = move_blocks(
@@ -137,7 +142,7 @@ pub fn execute_mechanism(
                     }
                     listeners.turn_mechanism_on(x, y, false);
                 }
-            } else if *extended && !on {
+            } else if *extended && rs.signal <= 0 {
                 *extended = false;
 
                 listeners.update_entity(x, y);

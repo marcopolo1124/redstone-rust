@@ -72,14 +72,14 @@ pub fn propagate_signal_at(
             }
             Some(RedstoneKind::Mechanism) => {
                 let is_redstone = match mechanism {
-                    Some(MechanismKind::RedstoneTorch) | Some(MechanismKind::Repeater { .. }) =>
+                    Some(MechanismKind::RedstoneTorch) | Some(MechanismKind::Repeater { .. }) | Some(MechanismKind::Observer) =>
                         true,
                     _ => false,
                 };
                 if input_signal > 0 {
                     listeners.turn_mechanism_on(x, y, is_redstone);
                 } else {
-                    //  println!("turn off {x} {y}");
+                    //  // println!("turn off {x} {y}");
                     listeners.turn_mechanism_off(x, y, is_redstone);
                 }
             }
