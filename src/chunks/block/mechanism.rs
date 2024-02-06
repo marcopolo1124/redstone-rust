@@ -261,7 +261,7 @@ pub fn execute_mechanism(
                     calculations
                 );
 
-                listeners.turn_mechanism_off(x, y, false);
+                listeners.turn_mechanism_off(x, y, true);
             } else {
                 propagate_signal_at(
                     chunks,

@@ -81,7 +81,7 @@ impl EventListeners {
         };
 
         if from_port == orientation.get_opposing() {
-            self.turn_mechanism_on(x, y, false)
+            self.turn_mechanism_on(x, y, true)
         }
     }
 }
@@ -525,7 +525,7 @@ fn main() {
         .run()
 }
 
-const AUTOSAVE_INTERVAL_SECONDS: f32 = 3.0;
+const AUTOSAVE_INTERVAL_SECONDS: f32 = 60.0;
 const UPDATES_TIMER_INTERVAL_SECONDS: f32 = 5.0;
 
 fn init(
@@ -647,7 +647,6 @@ fn update_tick(
     if keyboard_input.just_pressed(KeyCode::E) {
         fast.0 = (fast.0 + 1) % 3;
         let current_rate = tick_rates[fast.0 as usize];
-        // println!("{current_rate}");
         let mutable = time.as_mut();
         *mutable = Time::from_seconds(current_rate);
     }
@@ -1000,9 +999,6 @@ fn execute_listeners(
     }
 
     let mechanism_listener = listeners.mechanism_listener.clone();
-    if mechanism_listener.len() > 0 {
-        // // println!("mechanism listener {:?}", mechanism_listener);
-    }
     listeners.mechanism_listener.clear();
     let mut calculations = 0;
     for ((x, y), on) in mechanism_listener {
