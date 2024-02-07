@@ -11,7 +11,7 @@ select block using number keys:
 7. observer
 8. Slime
 9. Button
-10. Lever
+0. Lever
 
 Alternatively, you can update selected blocks by holding left control and right clicking on the block you want.
 
