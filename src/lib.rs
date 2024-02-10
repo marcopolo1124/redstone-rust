@@ -527,8 +527,6 @@ pub fn run() {
         .unwrap_or(Path::new("local").join("save"));
 
     let all_blocks = create_all_block_map();
-    let blk_hashmap = blk_string_to_block_map();
-    println!("{:?}", blk_hashmap);
 
     let mut placeable: Vec<Block> = vec![
         DIRT,
@@ -1080,7 +1078,7 @@ fn execute_listeners(
 
     let mechanism_listener = listeners.mechanism_listener.clone();
     if mechanism_listener.len() > 0 {
-        println!("{:?}", mechanism_listener);
+        //println!("{:?}", mechanism_listener);
     };
     listeners.mechanism_listener.clear();
     let mut calculations = 0;
@@ -1104,9 +1102,9 @@ fn execute_listeners(
 
     let redstone_component_listener = listeners.redstone_component_listener.clone();
     listeners.redstone_component_listener.clear();
-    if redstone_component_listener.len() > 0 {
-        println!("{:?}", redstone_component_listener);
-    };
+    // if redstone_component_listener.len() > 0 {
+    //     println!("{:?}", redstone_component_listener);
+    // };
     for ((x, y), on) in redstone_component_listener {
         execute_mechanism(
             &mut chunks,

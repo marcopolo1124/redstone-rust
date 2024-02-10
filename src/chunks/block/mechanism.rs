@@ -97,7 +97,7 @@ pub fn execute_mechanism(
             let piston_head = if is_sticky { STICKY_PISTON_HEAD } else { PISTON_HEAD };
             let mut traversed = HashSet::new();
             *movable = false;
-            println!("{x} {y} executing with signal {}", rs.signal);
+            //println!("{x} {y} executing with signal {}", rs.signal);
             if rs.signal > 0 && !*extended {
                 let (next_x, next_y) = orientation.get_next_coord(x, y);
                 let affected_blocks = get_power(chunks, next_x, next_y, orientation, 12);

@@ -81,6 +81,7 @@ pub fn propagate_signal_at(
                 if input_signal > 0 {
                     listeners.turn_mechanism_on(x, y, is_redstone);
                 } else {
+                    // println!("{x} {y} turning off");
                     listeners.turn_mechanism_off(x, y, is_redstone);
                 }
             }
@@ -101,7 +102,7 @@ pub fn propagate_signal_at(
     *calculations += 1;
     if *calculations > 10000 {
         propagation_queue.append(x, y, input_signal, from_port, previous_signal, prev_signal_type);
-        println!("{x} {y} returned because too many calc");
+        //println!("{x} {y} returned because too many calc");
         return;
     }
 
@@ -111,7 +112,7 @@ pub fn propagate_signal_at(
     {
         if let Some(_) = from_port {
             if input_signal == *signal && input_signal > 0 {
-                println!("{x} {y} returned because equality");
+                //println!("{x} {y} returned because equality");
                 return;
             }
         }
@@ -120,7 +121,7 @@ pub fn propagate_signal_at(
             Some(curr_signal_type) => {
                 if let SignalType::Strong(true) = curr_signal_type {
                     if let Some(_) = from_port {
-                        println!("{x} {y} returned because source and cannot be powered");
+                        //println!("{x} {y} returned because source and cannot be powered");
                         return;
                     }
                 }
@@ -153,7 +154,7 @@ pub fn propagate_signal_at(
                         SignalType::Weak(false)
                     }
                     _ => {
-                        println!("{x} {y} returned because None type signal type");
+                        //println!("{x} {y} returned because None type signal type");
                         return;
                     }
                 }
@@ -163,7 +164,7 @@ pub fn propagate_signal_at(
         let current_signal = *signal;
         *signal = input_signal;
         let transmitted_signal = if input_signal > 0 { input_signal - 1 } else { 0 };
-        println!("{x} {y} signal is set to {}", *signal);
+        //println!("{x} {y} signal is set to {}", *signal);
         listeners.entity_map_update.insert((x, y));
         for (idx, port) in output_ports.iter().enumerate() {
             if *port {
