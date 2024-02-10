@@ -48,16 +48,16 @@ impl EventListeners {
         self.entity_map_update.insert((x, y));
     }
 
-    pub fn turn_mechanism_on(&mut self, x: i128, y: i128, is_redstone: bool) {
-        if is_redstone {
+    pub fn turn_mechanism_on(&mut self, x: i128, y: i128, blk: &Block) {
+        if let Block{redstone: Some(Redstone{is_redstone_component: true, ..}), ..} = blk {
             self.redstone_component_listener.insert((x, y), true);
         } else {
             self.mechanism_listener.insert((x, y), true);
         }
     }
 
-    pub fn turn_mechanism_off(&mut self, x: i128, y: i128, is_redstone: bool) {
-        if is_redstone {
+    pub fn turn_mechanism_off(&mut self, x: i128, y: i128, blk: &Block) {
+        if let Block{redstone: Some(Redstone{is_redstone_component: true, ..}), ..} = blk {
             self.redstone_component_listener.insert((x, y), false);
         } else {
             self.mechanism_listener.insert((x, y), false);
@@ -82,7 +82,7 @@ impl EventListeners {
         };
 
         if from_port == orientation.get_opposing() {
-            self.turn_mechanism_on(x, y, true)
+            self.turn_mechanism_on(x, y, &blk.unwrap())
         }
     }
 }
@@ -320,7 +320,7 @@ const BUTTON: Block = Block {
     redstone: Some(Redstone {
         signal: 0,
         signal_type: Some(SignalType::Strong(true)),
-        is_redstone_component: true,
+        is_redstone_component: false,
         kind: Some(RedstoneKind::Mechanism),
         signal_type_port_mapping: [
             Some(SignalType::Strong(true)),
@@ -342,7 +342,7 @@ const LEVER: Block = Block {
     symmetric: true,
     redstone: Some(Redstone {
         signal: 0,
-        is_redstone_component: true,
+        is_redstone_component: false,
         signal_type: Some(SignalType::Strong(true)),
         kind: Some(RedstoneKind::Mechanism),
         signal_type_port_mapping: [
@@ -401,7 +401,7 @@ const OBSERVER: Block = Block {
     symmetric: false,
     redstone: Some(Redstone {
         signal: 0,
-        is_redstone_component: true,
+        is_redstone_component: false,
         signal_type_port_mapping: [Some(SignalType::Strong(true)), None, None, None],
         signal_type: Some(SignalType::Strong(true)),
         kind: Some(RedstoneKind::Mechanism),
@@ -442,7 +442,7 @@ const PISTON: Block = Block {
     symmetric: false,
     redstone: Some(Redstone {
         signal: 0,
-        signal_type: Some(SignalType::Weak(true)),
+        signal_type: Some(SignalType::Strong(true)),
         is_redstone_component: false,
         signal_type_port_mapping: [None, None, None, None],
         kind: Some(RedstoneKind::Mechanism),
@@ -470,7 +470,7 @@ const STICKY_PISTON: Block = Block {
     symmetric: false,
     redstone: Some(Redstone {
         signal: 0,
-        signal_type: Some(SignalType::Weak(true)),
+        signal_type: Some(SignalType::Strong(true)),
         is_redstone_component: false,
         signal_type_port_mapping: [None, None, None, None],
         kind: Some(RedstoneKind::Mechanism),
@@ -490,6 +490,52 @@ const STICKY_PISTON_HEAD: Block = Block {
     mechanism: None,
 };
 
+const TARGET_BLOCK: Block = Block {
+    movable: true,
+    sticky: false,
+    orientation: Orientation::Up,
+    texture_name: TextureName::TargetBlock,
+    symmetric: true,
+    redstone: Some(Redstone {
+        signal: 0,
+        signal_type: Some(SignalType::Weak(true)),
+        is_redstone_component: true,
+        signal_type_port_mapping: [
+            Some(SignalType::Weak(true)),
+            Some(SignalType::Weak(true)),
+            Some(SignalType::Weak(true)),
+            Some(SignalType::Weak(true)),
+        ],
+        kind: Some(RedstoneKind::Block),
+        input_ports: [true, true, true, true],
+        output_ports: [true, true, true, true],
+    }),
+    mechanism: None,
+};
+
+const REDSTONE_BLOCK: Block = Block {
+    movable: true,
+    sticky: false,
+    orientation: Orientation::Up,
+    texture_name: TextureName::RedstoneBlock,
+    symmetric: true,
+    redstone: Some(Redstone {
+        signal: 16,
+        signal_type: Some(SignalType::Weak(true)),
+        is_redstone_component: true,
+        signal_type_port_mapping: [
+            Some(SignalType::Weak(true)),
+            Some(SignalType::Weak(true)),
+            Some(SignalType::Weak(true)),
+            Some(SignalType::Weak(true)),
+        ],
+        kind: Some(RedstoneKind::Block),
+        input_ports: [true, true, true, true],
+        output_ports: [true, true, true, true],
+    }),
+    mechanism: None,
+};
+
 fn create_all_block_map() -> HashMap<TextureName, Block>{
     let mut  hashmap = HashMap::from([
         (TextureName::Dirt, DIRT),
@@ -504,7 +550,9 @@ fn create_all_block_map() -> HashMap<TextureName, Block>{
         (TextureName::SlimeBlock, SLIME),
         (TextureName::Button, BUTTON),
         (TextureName::Lever, LEVER),
-        (TextureName::Comparator, COMPARATOR)
+        (TextureName::Comparator, COMPARATOR),
+        (TextureName::TargetBlock, TARGET_BLOCK),
+        (TextureName::RedstoneBlock, REDSTONE_BLOCK)
     ]);
 
     for wool in WOOL_TEXTURES{
@@ -539,7 +587,9 @@ pub fn run() {
         PISTON,
         STICKY_PISTON,
         REPEATER,
-        COMPARATOR
+        COMPARATOR,
+        TARGET_BLOCK,
+        REDSTONE_BLOCK
     ];
 
     for wool in WOOL_TEXTURES{
@@ -692,6 +742,10 @@ pub fn update_selected_block(
         selected.0 = Some(BUTTON);
     } else if keyboard_input.pressed(KeyCode::Key0) {
         selected.0 = Some(LEVER);
+    } else if keyboard_input.pressed(KeyCode::Minus){
+        selected.0 = Some(TARGET_BLOCK)
+    } else if keyboard_input.pressed(KeyCode::Equals){
+        selected.0 = Some(REDSTONE_BLOCK)
     }
 }
 
@@ -1078,7 +1132,7 @@ fn execute_listeners(
 
     let mechanism_listener = listeners.mechanism_listener.clone();
     if mechanism_listener.len() > 0 {
-        //println!("{:?}", mechanism_listener);
+        // println!("{:?}", mechanism_listener);
     };
     listeners.mechanism_listener.clear();
     let mut calculations = 0;
@@ -1102,9 +1156,9 @@ fn execute_listeners(
 
     let redstone_component_listener = listeners.redstone_component_listener.clone();
     listeners.redstone_component_listener.clear();
-    // if redstone_component_listener.len() > 0 {
-    //     println!("{:?}", redstone_component_listener);
-    // };
+    if redstone_component_listener.len() > 0 {
+        // println!("{:?}", redstone_component_listener);
+    };
     for ((x, y), on) in redstone_component_listener {
         execute_mechanism(
             &mut chunks,
@@ -1145,7 +1199,7 @@ fn interact(
             *tick = (*tick + 1) % 4;
         }
         Some(Block { mechanism: Some(MechanismKind::Button) | Some(MechanismKind::Lever), .. }) => {
-            listeners.turn_mechanism_on(x, y, true);
+            listeners.turn_mechanism_on(x, y, &blk.unwrap());
         }
         Some(Block { mechanism: Some(MechanismKind::Comparator { mode }), .. }) => {
             if *mode == ComparatorModes::Compare{
@@ -1153,7 +1207,7 @@ fn interact(
             } else{
                 *mode = ComparatorModes::Compare
             }
-            listeners.turn_mechanism_on(x, y, true);
+            listeners.turn_mechanism_on(x, y, &blk.unwrap());
         }
         _ => {}
     }

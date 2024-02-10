@@ -29,6 +29,8 @@ let marcoBlocks = {
   ObserverBlock: "Observer",
   Button: "Button",
   Lever: "Lever",
+  TargetBlock: "TargetBlock",
+  RedstoneBlock: "RedstoneBlock"
 };
 
 /*

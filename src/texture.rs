@@ -9,6 +9,11 @@ pub struct ImageAssets {
     #[asset(image(sampler = nearest))]
     redstone_torch: Handle<TextureAtlas>,
 
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 1, rows = 1))]
+    #[asset(path = "images/redstone_block.png")]
+    #[asset(image(sampler = nearest))]
+    redstone_block: Handle<TextureAtlas>,
+
     #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 2, rows = 1))]
     #[asset(path = "images/button.png")]
     #[asset(image(sampler = nearest))]
@@ -59,10 +64,10 @@ pub struct ImageAssets {
     #[asset(image(sampler = nearest))]
     comparator: Handle<TextureAtlas>,
 
-    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 16, rows = 1))]
-    #[asset(path = "images/redstone_dust.png")]
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 1, rows = 1))]
+    #[asset(path = "images/target_block.png")]
     #[asset(image(sampler = nearest))]
-    redstone_dust: Handle<TextureAtlas>,
+    target_block: Handle<TextureAtlas>,
 
     #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 176, rows = 1))]
     #[asset(path = "images/redstone_dust_var.png")]
@@ -147,8 +152,9 @@ pub struct ImageAssets {
 pub fn get_atlas(texture_name: TextureName, image_assets: &ImageAssets) -> Handle<TextureAtlas> {
     match texture_name {
         TextureName::Dirt => image_assets.dirt.clone(),
+        TextureName::RedstoneBlock => image_assets.redstone_block.clone(),
         TextureName::RedstoneTorch => image_assets.redstone_torch.clone(),
-        TextureName::RedstoneCross => image_assets.redstone_dust.clone(),
+        TextureName::TargetBlock => image_assets.target_block.clone(),
         TextureName::RedstoneDust => image_assets.redstone_dust_var.clone(),
         TextureName::Piston => image_assets.piston.clone(),
         TextureName::StickyPiston => image_assets.sticky_piston.clone(),
@@ -183,7 +189,8 @@ pub fn get_atlas(texture_name: TextureName, image_assets: &ImageAssets) -> Handl
 pub enum TextureName {
     Dirt,
     RedstoneTorch,
-    RedstoneCross,
+    RedstoneBlock,
+    TargetBlock,
     RedstoneDust,
     Piston,
     StickyPiston,
@@ -224,7 +231,8 @@ impl TextureName {
         vec![
             TextureName::Dirt,
             TextureName::RedstoneTorch,
-            TextureName::RedstoneCross,
+            TextureName::RedstoneBlock,
+            TextureName::TargetBlock,
             TextureName::RedstoneDust,
             TextureName::Piston,
             TextureName::StickyPiston,

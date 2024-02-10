@@ -12,11 +12,12 @@ pub fn propagate_signal_at(
     propagation_queue: &mut PropagationQueue,
     calculations: &mut u32
 ) {
-    if (input_signal <= 0 && previous_signal <= 1) || input_signal == 1 {
+    if input_signal <= 0 && previous_signal <= 1 {
         return;
     }
 
     let curr_blk = chunks.get_block(x, y);
+    let blk_ref = curr_blk.clone();
 
     let (
         signal,
@@ -25,7 +26,7 @@ pub fn propagate_signal_at(
         input_ports,
         output_ports,
         signal_type_port_mapping,
-        mechanism,
+        is_redstone_component,
     ) = match *curr_blk {
         Some(
             Block {
@@ -37,10 +38,9 @@ pub fn propagate_signal_at(
                         input_ports,
                         output_ports,
                         signal_type_port_mapping,
-                        ..
+                        is_redstone_component
                     },
                 ),
-                mechanism,
                 ..
             },
         ) =>
@@ -51,7 +51,7 @@ pub fn propagate_signal_at(
                 input_ports,
                 output_ports,
                 signal_type_port_mapping,
-                mechanism,
+                is_redstone_component
             ),
         _ => {
             return;
@@ -64,7 +64,7 @@ pub fn propagate_signal_at(
         }
 
         match kind {
-            Some(RedstoneKind::Dust) => {
+            Some(RedstoneKind::Dust) | Some(RedstoneKind::Block)=> {
                 if let Some(SignalType::Weak(false)) = prev_signal_type {
                     return;
                 } else if let None = prev_signal_type {
@@ -72,17 +72,10 @@ pub fn propagate_signal_at(
                 }
             }
             Some(RedstoneKind::Mechanism) => {
-                let is_redstone = match mechanism {
-                    | Some(MechanismKind::RedstoneTorch)
-                    | Some(MechanismKind::Repeater { .. })
-                    | Some(MechanismKind::Observer) => true,
-                    _ => false,
-                };
                 if input_signal > 0 {
-                    listeners.turn_mechanism_on(x, y, is_redstone);
+                    listeners.turn_mechanism_on(x, y, &blk_ref.unwrap());
                 } else {
-                    // println!("{x} {y} turning off");
-                    listeners.turn_mechanism_off(x, y, is_redstone);
+                    listeners.turn_mechanism_off(x, y, &blk_ref.unwrap());
                 }
             }
             None => {
@@ -92,9 +85,6 @@ pub fn propagate_signal_at(
                     }
                     _ => {}
                 }
-            }
-            _ => {
-                return;
             }
         }
     }
@@ -121,8 +111,15 @@ pub fn propagate_signal_at(
             Some(curr_signal_type) => {
                 if let SignalType::Strong(true) = curr_signal_type {
                     if let Some(_) = from_port {
-                        //println!("{x} {y} returned because source and cannot be powered");
-                        return;
+                        if is_redstone_component {
+                            return;
+                        }
+                        
+                    }
+                } else if let SignalType::Weak(true) = curr_signal_type {
+                    match prev_signal_type {
+                        Some(SignalType::Weak(false)) | None => return,
+                        _ => ()
                     }
                 }
 
@@ -154,7 +151,6 @@ pub fn propagate_signal_at(
                         SignalType::Weak(false)
                     }
                     _ => {
-                        //println!("{x} {y} returned because None type signal type");
                         return;
                     }
                 }
@@ -163,6 +159,11 @@ pub fn propagate_signal_at(
 
         let current_signal = *signal;
         *signal = input_signal;
+
+        if input_signal == 1 {
+            return
+        }
+
         let transmitted_signal = if input_signal > 0 { input_signal - 1 } else { 0 };
         //println!("{x} {y} signal is set to {}", *signal);
         listeners.entity_map_update.insert((x, y));
@@ -257,25 +258,25 @@ pub fn get_max_prev(
                         signal_type = Some(sig_type);
                     }
 
-                    let max_type_value = match max_signal_type {
-                        Some(SignalType::Strong(true)) => 10,
-                        Some(SignalType::Strong(false)) => 9,
-                        Some(SignalType::Weak(true)) => 8,
-                        Some(SignalType::Weak(false)) => 7,
-                        None => 0,
-                    };
+                    // let max_type_value = match max_signal_type {
+                    //     Some(SignalType::Strong(true)) => 10,
+                    //     Some(SignalType::Strong(false)) => 9,
+                    //     Some(SignalType::Weak(true)) => 8,
+                    //     Some(SignalType::Weak(false)) => 8,
+                    //     None => 0,
+                    // };
 
-                    let type_value = match signal_type {
-                        Some(SignalType::Strong(true)) => 10,
-                        Some(SignalType::Strong(false)) => 9,
-                        Some(SignalType::Weak(true)) => 8,
-                        Some(SignalType::Weak(false)) => 7,
-                        None => 0,
-                    };
+                    // let type_value = match signal_type {
+                    //     Some(SignalType::Strong(true)) => 10,
+                    //     Some(SignalType::Strong(false)) => 9,
+                    //     Some(SignalType::Weak(true)) => 8,
+                    //     Some(SignalType::Weak(false)) => 8,
+                    //     None => 0,
+                    // };
 
-                    if type_value > max_type_value {
-                        max_signal_type = signal_type;
-                    }
+                    // if type_value > max_type_value {
+                    max_signal_type = signal_type;
+                    // }
                 }
             }
         }
