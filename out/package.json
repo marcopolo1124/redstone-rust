@@ -2,12 +2,12 @@
     "name": "redstone-rust",
     "version": "0.1.0",
     "files": [
-      "redstone_rust_bg.wasm",
-      "redstone_rust.js",
-      "redstone_rust.js",
-      "redstone_rust.d.ts"
+      "redstone-rust_bg.wasm",
+      "redstone-rust.js",
+      "redstone-rust.js",
+      "redstone-rust.d.ts"
     ],
-    "module": "redstone_rust.js",
-    "types": "redstone_rust.d.ts",
+    "module": "redstone-rust.js",
+    "types": "redstone-rust.d.ts",
     "sideEffects": false
   }

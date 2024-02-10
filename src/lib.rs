@@ -1,6 +1,7 @@
 mod chunks;
 use std::{ f32::consts::PI, path::Path };
 use std::time::Duration;
+use bevy::asset::AssetMetaCheck;
 use wasm_bindgen::prelude::*;
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 
@@ -105,7 +106,7 @@ fn blk_string_to_block_map() -> HashMap<String, Block> {
         }
         
     }
-    println!("{:?}", hashmap);
+
     hashmap
 }
 
@@ -115,13 +116,12 @@ pub struct SaveData(Vec<((i128, i128), Block)>);
 
 #[wasm_bindgen]
 impl SaveData {
-    pub fn new() -> SaveData{
+    pub fn new_save() -> SaveData{
         SaveData(Vec::new())
     }
     
-    pub fn append(&mut self, blk_type: &str, orientation: u32, x: i64, y: i64){
+    pub fn append_block(&mut self, blk_type: &str, orientation: u32, x: i64, y: i64){
         let blk_map = blk_string_to_block_map();
-        println!("available blocks {:?}", blk_map);
         let mut blk = if let Some(blk) = blk_map.get(blk_type){
             *blk
         } else{
@@ -501,6 +501,8 @@ pub fn run() {
         .unwrap_or(Path::new("local").join("save"));
 
     let all_blocks = create_all_block_map();
+    let blk_hashmap = blk_string_to_block_map();
+    println!("{:?}", blk_hashmap);
 
     let mut placeable: Vec<Block> = vec![
         DIRT,
@@ -531,6 +533,7 @@ pub fn run() {
     }
 
     App::new()
+        .insert_resource(AssetMetaCheck::Never)
         .add_state::<MyStates>()
         .add_plugins(FrameTimeDiagnosticsPlugin::default())
         .insert_resource(Time::<Fixed>::from_seconds(TICK))

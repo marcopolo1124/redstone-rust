@@ -74,9 +74,9 @@ export function convertToMarcoBlocks(obj) {
                 orientation = 3
             }
 
-            let save = SaveData.new()
+            let save = SaveData.new_save()
             //append(blk_type: string, orientation: number, x: bigint, y: bigint)
-            save.append(marcoblock, orientation, BigInt(x), BigInt(y))
+            save.append_block(marcoblock, orientation, BigInt(x), BigInt(y))
             console.log({save: save.json_string()})
         }
     }

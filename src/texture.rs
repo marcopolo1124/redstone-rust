@@ -215,7 +215,9 @@ pub enum TextureName {
 
 impl TextureName {
     pub fn get_string_value(&self) -> String {
-        serde_json::to_string(&self).unwrap()
+        let str = serde_json::to_string(&self).unwrap();
+        let string_val: String = serde_json::from_str(&str).unwrap();
+        string_val
     }
 
     pub fn iter() -> Vec<TextureName> {
