@@ -210,5 +210,56 @@ pub enum TextureName {
     PurpleWool,
     RedWool,
     WhiteWool,
-    YellowWool
+    YellowWool,
+}
+
+impl TextureName {
+    pub fn get_string_value(&self) -> String {
+        serde_json::to_string(&self).unwrap()
+    }
+
+    pub fn iter() -> Vec<TextureName> {
+        vec![
+            TextureName::Dirt,
+            TextureName::RedstoneTorch,
+            TextureName::RedstoneCross,
+            TextureName::RedstoneDust,
+            TextureName::Piston,
+            TextureName::StickyPiston,
+            TextureName::PistonHead,
+            TextureName::StickyPistonHead,
+            TextureName::Repeater,
+            TextureName::Comparator,
+            TextureName::Observer,
+            TextureName::SlimeBlock,
+            TextureName::Button,
+            TextureName::Lever,
+            TextureName::BlackWool,
+            TextureName::BlueWool,
+            TextureName::BrownWool,
+            TextureName::CyanWool,
+            TextureName::GrayWool,
+            TextureName::GreenWool,
+            TextureName::LightBlueWool,
+            TextureName::LightGrayWool,
+            TextureName::LimeWool,
+            TextureName::MagentaWool,
+            TextureName::OrangeWool,
+            TextureName::PinkWool,
+            TextureName::PurpleWool,
+            TextureName::RedWool,
+            TextureName::WhiteWool,
+            TextureName::YellowWool,
+        ]
+    }
+
+    pub fn texture_map() -> HashMap<String, TextureName>{
+        let all_textures = TextureName::iter();
+        
+        let mut hashmap = HashMap::new(); 
+        for texture in all_textures {
+            hashmap.insert(texture.get_string_value(), texture);
+        }
+        hashmap
+    }
 }
