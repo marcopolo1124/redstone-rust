@@ -2,25 +2,21 @@
     import { onMount } from 'svelte'
     import init, {run} from "redstone-wasm";
     import {decompressObject, convertToMarcoBlocks} from "$lib"
+    import { invalidate } from '$app/navigation';
     let save = ""
 
-    $: console.log({save})
-
     onMount(async() =>{
-        console.log("mount")
         await init()
         run()
     })
 
-    
-
 </script>
 
-<h1>hi</h1>
 <form on:submit={() => {
     let obj = decompressObject(save)
-    console.log({obj})
-    convertToMarcoBlocks(obj)
+    let json_string = convertToMarcoBlocks(obj)
+    localStorage.setItem("save/save_data.json", json_string)
+    location.reload()
 }}>
     <textarea bind:value={save}></textarea>
     <input type="submit" value="save"/>

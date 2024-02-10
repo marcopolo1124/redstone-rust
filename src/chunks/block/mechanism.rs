@@ -39,14 +39,14 @@ pub fn execute_mechanism(
     let blk = if let Some(blk) = maybe_blk {
         blk
     } else {
-                return;
+        return;
     };
 
     let Block { orientation, mechanism, redstone, movable, .. } = blk;
     let mechanism_kind = if let Some(mechanism_kind) = mechanism {
         mechanism_kind
     } else {
-                return;
+        return;
     };
 
     let orientation = *orientation;
@@ -97,6 +97,7 @@ pub fn execute_mechanism(
             let piston_head = if is_sticky { STICKY_PISTON_HEAD } else { PISTON_HEAD };
             let mut traversed = HashSet::new();
             *movable = false;
+            println!("{x} {y} executing with signal {}", rs.signal);
             if rs.signal > 0 && !*extended {
                 let (next_x, next_y) = orientation.get_next_coord(x, y);
                 let affected_blocks = get_power(chunks, next_x, next_y, orientation, 12);
@@ -188,6 +189,12 @@ pub fn execute_mechanism(
                 if let Some(movable) = get_movable(chunks, x, y) {
                     *movable = true;
                 }
+            } else{
+                if *extended {
+                    *movable = false
+                } else {
+                    *movable = true
+                }
             }
         }
         MechanismKind::Repeater { countdown, tick } => {
@@ -206,13 +213,13 @@ pub fn execute_mechanism(
             if *countdown > 0 {
                 *countdown -= 1;
                 if on {
-                    listeners.turn_mechanism_on(x, y, false);
+                    listeners.turn_mechanism_on(x, y, true);
                 } else {
-                    listeners.turn_mechanism_off(x, y, false);
+                    listeners.turn_mechanism_off(x, y, true);
                 }
             } else if *countdown == 0 {
                 *countdown -= 1;
-                if signal <= 0 && on {
+                if signal <= 0 {
                     propagate_signal_at(
                         chunks,
                         x,
@@ -225,7 +232,10 @@ pub fn execute_mechanism(
                         propagation_queue,
                         calculations
                     );
-                } else if signal > 0 && !on{
+                    if !on {
+                        listeners.turn_mechanism_off(x, y, true);
+                    }
+                } else if !on{
                     propagate_signal_at(
                         chunks,
                         x,

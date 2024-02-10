@@ -4,7 +4,7 @@ export const memory: WebAssembly.Memory;
 export function main(a: number, b: number): number;
 export function __wbg_savedata_free(a: number): void;
 export function savedata_new_save(): number;
-export function savedata_append_block(a: number, b: number, c: number, d: number, e: number, f: number): void;
+export function savedata_append_block(a: number, b: number, c: number, d: number, e: number, f: number, g: number): void;
 export function savedata_json_string(a: number, b: number): void;
 export function run(): void;
 export function wgpu_compute_pass_set_pipeline(a: number, b: number): void;

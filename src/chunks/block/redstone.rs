@@ -37,6 +37,7 @@ pub fn propagate_signal_at(
                         input_ports,
                         output_ports,
                         signal_type_port_mapping,
+                        ..
                     },
                 ),
                 mechanism,
@@ -72,8 +73,9 @@ pub fn propagate_signal_at(
             }
             Some(RedstoneKind::Mechanism) => {
                 let is_redstone = match mechanism {
-                    Some(MechanismKind::RedstoneTorch) | Some(MechanismKind::Repeater { .. }) | Some(MechanismKind::Observer) =>
-                        true,
+                    | Some(MechanismKind::RedstoneTorch)
+                    | Some(MechanismKind::Repeater { .. })
+                    | Some(MechanismKind::Observer) => true,
                     _ => false,
                 };
                 if input_signal > 0 {
@@ -99,6 +101,7 @@ pub fn propagate_signal_at(
     *calculations += 1;
     if *calculations > 10000 {
         propagation_queue.append(x, y, input_signal, from_port, previous_signal, prev_signal_type);
+        println!("{x} {y} returned because too many calc");
         return;
     }
 
@@ -108,6 +111,7 @@ pub fn propagate_signal_at(
     {
         if let Some(_) = from_port {
             if input_signal == *signal && input_signal > 0 {
+                println!("{x} {y} returned because equality");
                 return;
             }
         }
@@ -116,6 +120,7 @@ pub fn propagate_signal_at(
             Some(curr_signal_type) => {
                 if let SignalType::Strong(true) = curr_signal_type {
                     if let Some(_) = from_port {
+                        println!("{x} {y} returned because source and cannot be powered");
                         return;
                     }
                 }
@@ -148,6 +153,7 @@ pub fn propagate_signal_at(
                         SignalType::Weak(false)
                     }
                     _ => {
+                        println!("{x} {y} returned because None type signal type");
                         return;
                     }
                 }
@@ -157,7 +163,7 @@ pub fn propagate_signal_at(
         let current_signal = *signal;
         *signal = input_signal;
         let transmitted_signal = if input_signal > 0 { input_signal - 1 } else { 0 };
-
+        println!("{x} {y} signal is set to {}", *signal);
         listeners.entity_map_update.insert((x, y));
         for (idx, port) in output_ports.iter().enumerate() {
             if *port {
@@ -185,7 +191,7 @@ pub fn propagate_signal_at(
             }
         }
     }
-    if input_signal == 0 && prev_signal_type != None{
+    if input_signal == 0 && prev_signal_type != None {
         listeners.repropagate(x, y)
     }
 }
@@ -291,10 +297,8 @@ pub fn is_redstone(chunks: &Chunks, x: i128, y: i128, input_port: Orientation) -
     };
     if
         (redstone.input_ports[input_port.to_port_idx()] ||
-            redstone.kind == Some(RedstoneKind::Dust) ||
             redstone.output_ports[input_port.to_port_idx()]) &&
-        (redstone.signal_type == Some(SignalType::Strong(true)) ||
-            redstone.signal_type == Some(SignalType::Weak(true)))
+        redstone.is_redstone_component
     {
         true
     } else {

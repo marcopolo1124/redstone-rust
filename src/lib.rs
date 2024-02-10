@@ -120,10 +120,25 @@ impl SaveData {
         SaveData(Vec::new())
     }
     
-    pub fn append_block(&mut self, blk_type: &str, orientation: u32, x: i64, y: i64){
+    pub fn append_block(&mut self, blk_type: &str, orientation: u32, x: i64, y: i64, state: usize){
         let blk_map = blk_string_to_block_map();
         let mut blk = if let Some(blk) = blk_map.get(blk_type){
-            *blk
+            let new_blk = &mut blk.clone();
+
+            match new_blk{
+                Block{mechanism: Some(MechanismKind::Repeater { tick, .. }), ..} => {
+                    *tick = (state % 4) as i8;
+                },
+                Block{mechanism: Some(MechanismKind::Comparator{mode}), ..} => {
+                    if state % 2 == 0 {
+                        *mode = ComparatorModes::Compare
+                    } else{
+                        *mode = ComparatorModes::Subtract
+                    }
+                },
+                _ => {}
+            }
+            *new_blk
         } else{
             return
         };
@@ -227,6 +242,7 @@ const DIRT: Block = Block {
     redstone: Some(Redstone {
         signal: 0,
         signal_type: None,
+        is_redstone_component: false,
         kind: None,
         signal_type_port_mapping: [None, None, None, None],
         input_ports: [true, true, true, true],
@@ -263,6 +279,7 @@ const SLIME: Block = Block {
     redstone: Some(Redstone {
         signal: 0,
         signal_type: None,
+        is_redstone_component: false,
         kind: None,
         signal_type_port_mapping: [None, None, None, None],
         input_ports: [true, true, true, true],
@@ -280,6 +297,7 @@ const REDSTONE_TORCH: Block = Block {
     redstone: Some(Redstone {
         signal: 16,
         signal_type: Some(SignalType::Strong(true)),
+        is_redstone_component: true,
         kind: Some(RedstoneKind::Mechanism),
         signal_type_port_mapping: [
             Some(SignalType::Strong(true)),
@@ -302,6 +320,7 @@ const BUTTON: Block = Block {
     redstone: Some(Redstone {
         signal: 0,
         signal_type: Some(SignalType::Strong(true)),
+        is_redstone_component: true,
         kind: Some(RedstoneKind::Mechanism),
         signal_type_port_mapping: [
             Some(SignalType::Strong(true)),
@@ -323,6 +342,7 @@ const LEVER: Block = Block {
     symmetric: true,
     redstone: Some(Redstone {
         signal: 0,
+        is_redstone_component: true,
         signal_type: Some(SignalType::Strong(true)),
         kind: Some(RedstoneKind::Mechanism),
         signal_type_port_mapping: [
@@ -345,6 +365,7 @@ const REPEATER: Block = Block {
     symmetric: false,
     redstone: Some(Redstone {
         signal: 0,
+        is_redstone_component: true,
         signal_type_port_mapping: [Some(SignalType::Strong(true)), None, None, None],
         signal_type: Some(SignalType::Strong(true)),
         kind: Some(RedstoneKind::Mechanism),
@@ -362,6 +383,7 @@ const COMPARATOR: Block = Block {
     symmetric: false,
     redstone: Some(Redstone {
         signal: 0,
+        is_redstone_component: true,
         signal_type_port_mapping: [Some(SignalType::Strong(true)), None, None, None],
         signal_type: Some(SignalType::Strong(true)),
         kind: Some(RedstoneKind::Mechanism),
@@ -379,6 +401,7 @@ const OBSERVER: Block = Block {
     symmetric: false,
     redstone: Some(Redstone {
         signal: 0,
+        is_redstone_component: true,
         signal_type_port_mapping: [Some(SignalType::Strong(true)), None, None, None],
         signal_type: Some(SignalType::Strong(true)),
         kind: Some(RedstoneKind::Mechanism),
@@ -397,6 +420,7 @@ const REDSTONE_DUST: Block = Block {
     redstone: Some(Redstone {
         signal: 0,
         signal_type: Some(SignalType::Weak(true)),
+        is_redstone_component: true,
         signal_type_port_mapping: [
             Some(SignalType::Weak(true)),
             Some(SignalType::Weak(true)),
@@ -419,6 +443,7 @@ const PISTON: Block = Block {
     redstone: Some(Redstone {
         signal: 0,
         signal_type: Some(SignalType::Weak(true)),
+        is_redstone_component: false,
         signal_type_port_mapping: [None, None, None, None],
         kind: Some(RedstoneKind::Mechanism),
         input_ports: [false, true, true, true],
@@ -446,6 +471,7 @@ const STICKY_PISTON: Block = Block {
     redstone: Some(Redstone {
         signal: 0,
         signal_type: Some(SignalType::Weak(true)),
+        is_redstone_component: false,
         signal_type_port_mapping: [None, None, None, None],
         kind: Some(RedstoneKind::Mechanism),
         input_ports: [false, true, true, true],
@@ -1053,6 +1079,9 @@ fn execute_listeners(
     }
 
     let mechanism_listener = listeners.mechanism_listener.clone();
+    if mechanism_listener.len() > 0 {
+        println!("{:?}", mechanism_listener);
+    };
     listeners.mechanism_listener.clear();
     let mut calculations = 0;
     for ((x, y), on) in mechanism_listener {
@@ -1071,9 +1100,13 @@ fn execute_listeners(
         );
     }
 
+
+
     let redstone_component_listener = listeners.redstone_component_listener.clone();
     listeners.redstone_component_listener.clear();
-
+    if redstone_component_listener.len() > 0 {
+        println!("{:?}", redstone_component_listener);
+    };
     for ((x, y), on) in redstone_component_listener {
         execute_mechanism(
             &mut chunks,

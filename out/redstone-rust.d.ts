@@ -16,8 +16,9 @@ export class SaveData {
 * @param {number} orientation
 * @param {bigint} x
 * @param {bigint} y
+* @param {number} state
 */
-  append_block(blk_type: string, orientation: number, x: bigint, y: bigint): void;
+  append_block(blk_type: string, orientation: number, x: bigint, y: bigint, state: number): void;
 /**
 * @returns {string}
 */
@@ -31,7 +32,7 @@ export interface InitOutput {
   readonly main: (a: number, b: number) => number;
   readonly __wbg_savedata_free: (a: number) => void;
   readonly savedata_new_save: () => number;
-  readonly savedata_append_block: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+  readonly savedata_append_block: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
   readonly savedata_json_string: (a: number, b: number) => void;
   readonly run: () => void;
   readonly wgpu_compute_pass_set_pipeline: (a: number, b: number) => void;
