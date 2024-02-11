@@ -148,7 +148,10 @@ pub fn place(
     }
 
     let mut blk_clone = *texture_to_block_map.get(&blk.texture_name).unwrap();
-    blk_clone.mechanism = blk.mechanism;
+    if let Block { mechanism: Some(MechanismKind::Piston { .. }), .. } = blk_clone {
+    } else {
+        blk_clone.mechanism = blk.mechanism;
+    }
 
     *calculations = 0;
 
@@ -196,7 +199,6 @@ pub fn place(
         }
 
         let (from_port, previous_signal, prev_signal_type) = get_max_prev(chunks, x, y);
-        // println!("placed at {x} {y} {:?} {previous_signal} {:?}", from_port, prev_signal_type);
         let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
 
         propagate_signal_at(

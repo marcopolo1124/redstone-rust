@@ -147,6 +147,16 @@ pub struct ImageAssets {
     #[asset(path = "images/wool/yellow_wool.png")]
     #[asset(image(sampler = nearest))]
     yellow_wool: Handle<TextureAtlas>,
+
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 12, rows = 1))]
+    #[asset(path = "images/redstone_lamp.png")]
+    #[asset(image(sampler = nearest))]
+    redstone_lamp: Handle<TextureAtlas>,
+
+    #[asset(texture_atlas(tile_size_x = 16.0, tile_size_y = 16.0, columns = 1, rows = 1))]
+    #[asset(path = "images/glass.png")]
+    #[asset(image(sampler = nearest))]
+    glass: Handle<TextureAtlas>,
 }
 
 pub fn get_atlas(texture_name: TextureName, image_assets: &ImageAssets) -> Handle<TextureAtlas> {
@@ -182,6 +192,9 @@ pub fn get_atlas(texture_name: TextureName, image_assets: &ImageAssets) -> Handl
         TextureName::RedWool => image_assets.red_wool.clone(),
         TextureName::WhiteWool => image_assets.white_wool.clone(),
         TextureName::YellowWool => image_assets.yellow_wool.clone(),
+        TextureName::RedstoneLamp => image_assets.redstone_lamp.clone(),
+        TextureName::Glass => image_assets.glass.clone()
+
     }
 }
 
@@ -218,6 +231,8 @@ pub enum TextureName {
     RedWool,
     WhiteWool,
     YellowWool,
+    RedstoneLamp,
+    Glass
 }
 
 impl TextureName {
@@ -260,6 +275,8 @@ impl TextureName {
             TextureName::RedWool,
             TextureName::WhiteWool,
             TextureName::YellowWool,
+            TextureName::RedstoneLamp,
+            TextureName::Glass
         ]
     }
 

@@ -1,4 +1,5 @@
 mod chunks;
+use std::fs;
 use std::{ f32::consts::PI, path::Path };
 use std::time::Duration;
 use bevy::asset::AssetMetaCheck;
@@ -288,6 +289,24 @@ const DIRT: Block = Block {
     mechanism: None,
 };
 
+const REDSTONE_LAMP: Block = Block {
+    movable: true,
+    sticky: false,
+    orientation: Orientation::Up,
+    texture_name: TextureName::RedstoneLamp,
+    symmetric: true,
+    redstone: Some(Redstone {
+        signal: 0,
+        signal_type: None,
+        is_redstone_component: false,
+        kind: None,
+        signal_type_port_mapping: [None, None, None, None],
+        input_ports: [true, true, true, true],
+        output_ports: [true, true, true, true],
+    }),
+    mechanism: None,
+};
+
 const WOOL_TEXTURES: [TextureName; 16] = [
     TextureName::BlackWool,
     TextureName::BlueWool,
@@ -357,13 +376,13 @@ const BUTTON: Block = Block {
     redstone: Some(Redstone {
         signal: 0,
         signal_type: Some(SignalType::Strong(true)),
-        is_redstone_component: false,
+        is_redstone_component: true,
         kind: Some(RedstoneKind::Mechanism),
         signal_type_port_mapping: [
             Some(SignalType::Strong(true)),
             Some(SignalType::Strong(true)),
             Some(SignalType::Strong(true)),
-            Some(SignalType::Strong(false)),
+            Some(SignalType::Strong(true)),
         ],
         input_ports: [false, false, false, false],
         output_ports: [true, true, true, true],
@@ -379,14 +398,14 @@ const LEVER: Block = Block {
     symmetric: true,
     redstone: Some(Redstone {
         signal: 0,
-        is_redstone_component: false,
+        is_redstone_component: true,
         signal_type: Some(SignalType::Strong(true)),
         kind: Some(RedstoneKind::Mechanism),
         signal_type_port_mapping: [
             Some(SignalType::Strong(true)),
             Some(SignalType::Strong(true)),
             Some(SignalType::Strong(true)),
-            Some(SignalType::Strong(false)),
+            Some(SignalType::Strong(true)),
         ],
         input_ports: [false, false, false, false],
         output_ports: [true, true, true, true],
@@ -573,6 +592,16 @@ const REDSTONE_BLOCK: Block = Block {
     mechanism: None,
 };
 
+const GLASS: Block = Block{
+    movable: true,
+    sticky: false,
+    orientation: Orientation::Up,
+    texture_name: TextureName::Glass,
+    symmetric: false,
+    redstone: None,
+    mechanism: None,
+};
+
 fn create_all_block_map() -> HashMap<TextureName, Block>{
     let mut  hashmap = HashMap::from([
         (TextureName::Dirt, DIRT),
@@ -589,7 +618,9 @@ fn create_all_block_map() -> HashMap<TextureName, Block>{
         (TextureName::Lever, LEVER),
         (TextureName::Comparator, COMPARATOR),
         (TextureName::TargetBlock, TARGET_BLOCK),
-        (TextureName::RedstoneBlock, REDSTONE_BLOCK)
+        (TextureName::RedstoneBlock, REDSTONE_BLOCK),
+        (TextureName::Glass, GLASS),
+        (TextureName::RedstoneLamp, REDSTONE_LAMP)
     ]);
 
     for wool in WOOL_TEXTURES{
@@ -628,7 +659,9 @@ pub fn run() {
         REPEATER,
         COMPARATOR,
         TARGET_BLOCK,
-        REDSTONE_BLOCK
+        REDSTONE_BLOCK,
+        GLASS,
+        REDSTONE_LAMP
     ];
 
     for wool in WOOL_TEXTURES{
@@ -637,13 +670,18 @@ pub fn run() {
         placeable.push(wool_blk);
     }
 
-    let mut default_save = Vec::new();
-    let start_x = 0;
-    let start_y = 0;
+    // let mut default_save = Vec::new();
+    // let start_x = 0;
+    // let start_y = 0;
 
-    for (idx, blk) in placeable.iter().enumerate() {
-        default_save.push(((start_x as i128, start_y + idx as i128), *blk));
-    }
+    let file_path = "saves/save_data.json";
+    let contents = fs::read_to_string(file_path)
+        .expect("Should have been able to read the file");
+    let save_data: SaveData = serde_json::from_str(&contents).unwrap();
+
+    // for (idx, blk) in placeable.iter().enumerate() {
+    //     default_save.push(((start_x as i128, start_y + idx as i128), *blk));
+    // }
 
     App::new()
         .insert_resource(AssetMetaCheck::Never)
@@ -666,7 +704,7 @@ pub fn run() {
                 .name("save data")
                 .format(StorageFormat::Json)
                 .path(state_dir.join("save_data.json"))
-                .default(SaveData(default_save))
+                .default(save_data)
                 .build()
                 .expect("failed to initialize game state")
         )
@@ -693,7 +731,7 @@ pub fn run() {
         .run()
 }
 
-const AUTOSAVE_INTERVAL_SECONDS: f32 = 60.0;
+const AUTOSAVE_INTERVAL_SECONDS: f32 = 10.0;
 const UPDATES_TIMER_INTERVAL_SECONDS: f32 = 5.0;
 
 fn init(
@@ -738,20 +776,23 @@ fn init(
 
     let mut calculations = 0;
     for ((x, y), blk) in save_data.0.iter() {
-        place(
-            &mut chunks,
-            *blk,
-            blk.orientation,
-            *x,
-            *y,
-            &mut listeners,
-            &mut commands,
-            &image_assets,
-            &mut query,
-            &mut propagation_queue,
-            &mut calculations,
-            &texture_to_block_map.0
-        );
+        if blk.texture_name != TextureName::PistonHead && blk.texture_name != TextureName::StickyPistonHead{
+            place(
+                &mut chunks,
+                *blk,
+                blk.orientation,
+                *x,
+                *y,
+                &mut listeners,
+                &mut commands,
+                &image_assets,
+                &mut query,
+                &mut propagation_queue,
+                &mut calculations,
+                &texture_to_block_map.0
+            );
+        }
+
     }
 }
 
@@ -786,6 +827,10 @@ pub fn update_selected_block(
         selected.0 = Some(TARGET_BLOCK)
     } else if keyboard_input.pressed(KeyCode::Equals){
         selected.0 = Some(REDSTONE_BLOCK)
+    } else if keyboard_input.pressed(KeyCode::Backslash){
+        selected.0 = Some(REDSTONE_LAMP)
+    } else if keyboard_input.pressed(KeyCode::Slash){
+        selected.0 = Some(GLASS)
     }
 }
 
@@ -979,6 +1024,17 @@ fn get_state(blk: Block) -> usize {
             let conn_ind = get_connection(&output_ports);
 
             conn_ind * 16 + (signal as usize)
+        }
+        Block{
+            redstone: Some(Redstone { signal, .. }),
+            texture_name: TextureName::RedstoneLamp,
+            ..
+        } => {
+            if signal > 0 {
+                1
+            } else{
+                0
+            }
         }
         Block {
             redstone: Some(Redstone { signal, kind: Some(RedstoneKind::Mechanism), .. }),
