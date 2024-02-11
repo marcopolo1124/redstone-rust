@@ -32,6 +32,8 @@ pub struct EventListeners {
     pub mechanism_listener: HashMap<(i128, i128), bool>,
     pub repropagation_listener: HashSet<(i128, i128)>,
     pub redstone_component_listener: HashMap<(i128, i128), bool>,
+    pub interactable_component_listener: HashMap<(i128, i128), bool>,
+    pub state_component_listener: HashMap<(i128, i128), bool>
 }
 
 impl EventListeners {
@@ -41,6 +43,8 @@ impl EventListeners {
             mechanism_listener: HashMap::new(),
             repropagation_listener: HashSet::new(),
             redstone_component_listener: HashMap::new(),
+            interactable_component_listener: HashMap::new(),
+            state_component_listener: HashMap::new()
         }
     }
 
@@ -49,20 +53,53 @@ impl EventListeners {
     }
 
     pub fn turn_mechanism_on(&mut self, x: i128, y: i128, blk: &Block) {
-        if let Block{redstone: Some(Redstone{is_redstone_component: true, ..}), ..} = blk {
-            self.redstone_component_listener.insert((x, y), true);
-        } else {
-            self.mechanism_listener.insert((x, y), true);
+
+        let mechanism = if let Block{mechanism: Some(mech), ..} = blk {
+            mech
+        } else{
+            return
+        };
+
+        match mechanism {
+            MechanismKind::Observer => {
+                self.state_component_listener.insert((x, y), true);
+            }
+            MechanismKind::Lever | MechanismKind::Button => {
+                self.interactable_component_listener.insert((x, y), true);
+            }
+            MechanismKind::Comparator { .. } | MechanismKind::RedstoneTorch | MechanismKind::Repeater { .. } => {
+                self.redstone_component_listener.insert((x, y), true);
+            },
+            MechanismKind::Piston { .. } => {
+                self.mechanism_listener.insert((x, y), true);
+            }
         }
     }
 
     pub fn turn_mechanism_off(&mut self, x: i128, y: i128, blk: &Block) {
-        if let Block{redstone: Some(Redstone{is_redstone_component: true, ..}), ..} = blk {
-            self.redstone_component_listener.insert((x, y), false);
-        } else {
-            self.mechanism_listener.insert((x, y), false);
+
+        let mechanism = if let Block{mechanism: Some(mech), ..} = blk {
+            mech
+        } else{
+            return
+        };
+
+        match mechanism {
+            MechanismKind::Observer => {
+                self.state_component_listener.insert((x, y), false);
+            }
+            MechanismKind::Lever | MechanismKind::Button => {
+                self.interactable_component_listener.insert((x, y), false);
+            }
+            MechanismKind::Comparator { .. } | MechanismKind::RedstoneTorch | MechanismKind::Repeater { .. } => {
+                self.redstone_component_listener.insert((x, y), false);
+            },
+            MechanismKind::Piston { .. } => {
+                self.mechanism_listener.insert((x, y), false);
+            }
         }
     }
+
     pub fn remove_mechanism(&mut self, x: i128, y: i128) {
         self.mechanism_listener.remove(&(x, y));
     }
@@ -401,7 +438,7 @@ const OBSERVER: Block = Block {
     symmetric: false,
     redstone: Some(Redstone {
         signal: 0,
-        is_redstone_component: false,
+        is_redstone_component: true,
         signal_type_port_mapping: [Some(SignalType::Strong(true)), None, None, None],
         signal_type: Some(SignalType::Strong(true)),
         kind: Some(RedstoneKind::Mechanism),
@@ -564,6 +601,8 @@ fn create_all_block_map() -> HashMap<TextureName, Block>{
     hashmap
 }
 
+#[derive(Resource)]
+pub struct Speed(f32);
 
 #[wasm_bindgen]
 pub fn run() {
@@ -613,6 +652,7 @@ pub fn run() {
         .insert_resource(Time::<Fixed>::from_seconds(TICK))
         .add_plugins(DefaultPlugins)
         .insert_resource(Msaa::Off)
+        .insert_resource(Speed(500.))
         .insert_resource(chunks)
         .insert_resource(event_listeners)
         .insert_resource(PropagationQueue(Vec::new()))
@@ -1040,8 +1080,8 @@ fn update_entity(
     }
 }
 
-const SPEED: f32 = 500.0;
 pub fn move_camera(
+    speed: Res<Speed>,
     keyboard_input: Res<Input<KeyCode>>,
     mut query: Query<&mut Transform, With<Camera>>,
     time: Res<Time>
@@ -1066,7 +1106,7 @@ pub fn move_camera(
             direction = direction.normalize();
         }
 
-        transform.translation += direction * SPEED * time.delta_seconds();
+        transform.translation += direction * speed.0 * time.delta_seconds();
     }
 }
 
@@ -1129,6 +1169,45 @@ fn execute_listeners(
     if listeners.repropagation_listener.len() > 0 {
         return;
     }
+
+    let interactable_component_listener = listeners.interactable_component_listener.clone();
+    listeners.interactable_component_listener.clear();
+    let mut calculations = 0;
+    for ((x, y), on) in interactable_component_listener {
+        execute_mechanism(
+            &mut chunks,
+            x,
+            y,
+            on,
+            &mut listeners,
+            &mut commands,
+            &image_assets,
+            &mut query,
+            &mut propagation_queue,
+            &mut calculations,
+            &texture_to_block_map.0
+        );
+    }
+
+    let state_component_listener = listeners.state_component_listener.clone();
+    listeners.state_component_listener.clear();
+    let mut calculations = 0;
+    for ((x, y), on) in state_component_listener {
+        execute_mechanism(
+            &mut chunks,
+            x,
+            y,
+            on,
+            &mut listeners,
+            &mut commands,
+            &image_assets,
+            &mut query,
+            &mut propagation_queue,
+            &mut calculations,
+            &texture_to_block_map.0
+        );
+    }
+
 
     let mechanism_listener = listeners.mechanism_listener.clone();
     if mechanism_listener.len() > 0 {
@@ -1244,7 +1323,8 @@ fn autosave(
 use bevy::input::mouse::MouseWheel;
 pub fn zoom_camera(
     mut query: Query<&mut OrthographicProjection, With<Camera>>,
-    mut scroll_evr: EventReader<MouseWheel>
+    mut scroll_evr: EventReader<MouseWheel>,
+    mut speed: ResMut<Speed>
 ) {
     use bevy::input::mouse::MouseScrollUnit;
     if let Ok(mut transform) = query.get_single_mut() {
@@ -1280,6 +1360,7 @@ pub fn zoom_camera(
 
         if transform.scale + scale_delta > 0.0 {
             transform.scale += scale_delta;
+            speed.0 = 500. * transform.scale;
         } else {
             transform.scale = 0.0;
         }

@@ -196,7 +196,7 @@ pub fn place(
         }
 
         let (from_port, previous_signal, prev_signal_type) = get_max_prev(chunks, x, y);
-        println!("placed at {x} {y} {:?} {previous_signal} {:?}", from_port, prev_signal_type);
+        // println!("placed at {x} {y} {:?} {previous_signal} {:?}", from_port, prev_signal_type);
         let transmitted_signal = if previous_signal > 0 { previous_signal - 1 } else { 0 };
 
         propagate_signal_at(
