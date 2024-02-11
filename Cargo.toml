@@ -17,3 +17,5 @@ bevy-persistent = { version = "0.4.3", features = ["json"] }
 bevy_asset_loader = {version = "0.19.1", features=["2d"]}
 dirs = "5.0.1"
 serde = "1.0.196"
+serde_json = "1.0.113"
+wasm-bindgen = "0.2.91"

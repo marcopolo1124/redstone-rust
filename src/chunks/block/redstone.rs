@@ -12,11 +12,12 @@ pub fn propagate_signal_at(
     propagation_queue: &mut PropagationQueue,
     calculations: &mut u32
 ) {
-    if (input_signal <= 0 && previous_signal <= 1) || input_signal == 1 {
+    if input_signal <= 0 && previous_signal <= 1 {
         return;
     }
 
     let curr_blk = chunks.get_block(x, y);
+    let blk_ref = curr_blk.clone();
 
     let (
         signal,
@@ -25,7 +26,7 @@ pub fn propagate_signal_at(
         input_ports,
         output_ports,
         signal_type_port_mapping,
-        mechanism,
+        is_redstone_component,
     ) = match *curr_blk {
         Some(
             Block {
@@ -37,9 +38,9 @@ pub fn propagate_signal_at(
                         input_ports,
                         output_ports,
                         signal_type_port_mapping,
+                        is_redstone_component
                     },
                 ),
-                mechanism,
                 ..
             },
         ) =>
@@ -50,7 +51,7 @@ pub fn propagate_signal_at(
                 input_ports,
                 output_ports,
                 signal_type_port_mapping,
-                mechanism,
+                is_redstone_component
             ),
         _ => {
             return;
@@ -63,7 +64,7 @@ pub fn propagate_signal_at(
         }
 
         match kind {
-            Some(RedstoneKind::Dust) => {
+            Some(RedstoneKind::Dust) | Some(RedstoneKind::Block)=> {
                 if let Some(SignalType::Weak(false)) = prev_signal_type {
                     return;
                 } else if let None = prev_signal_type {
@@ -71,15 +72,10 @@ pub fn propagate_signal_at(
                 }
             }
             Some(RedstoneKind::Mechanism) => {
-                let is_redstone = match mechanism {
-                    Some(MechanismKind::RedstoneTorch) | Some(MechanismKind::Repeater { .. }) | Some(MechanismKind::Observer) =>
-                        true,
-                    _ => false,
-                };
                 if input_signal > 0 {
-                    listeners.turn_mechanism_on(x, y, is_redstone);
+                    listeners.turn_mechanism_on(x, y, &blk_ref.unwrap());
                 } else {
-                    listeners.turn_mechanism_off(x, y, is_redstone);
+                    listeners.turn_mechanism_off(x, y, &blk_ref.unwrap());
                 }
             }
             None => {
@@ -90,15 +86,13 @@ pub fn propagate_signal_at(
                     _ => {}
                 }
             }
-            _ => {
-                return;
-            }
         }
     }
 
     *calculations += 1;
     if *calculations > 10000 {
         propagation_queue.append(x, y, input_signal, from_port, previous_signal, prev_signal_type);
+        //println!("{x} {y} returned because too many calc");
         return;
     }
 
@@ -108,6 +102,7 @@ pub fn propagate_signal_at(
     {
         if let Some(_) = from_port {
             if input_signal == *signal && input_signal > 0 {
+                //println!("{x} {y} returned because equality");
                 return;
             }
         }
@@ -116,7 +111,15 @@ pub fn propagate_signal_at(
             Some(curr_signal_type) => {
                 if let SignalType::Strong(true) = curr_signal_type {
                     if let Some(_) = from_port {
-                        return;
+                        if is_redstone_component {
+                            return;
+                        }
+                        
+                    }
+                } else if let SignalType::Weak(true) = curr_signal_type {
+                    match prev_signal_type {
+                        Some(SignalType::Weak(false)) | None => return,
+                        _ => ()
                     }
                 }
 
@@ -156,8 +159,13 @@ pub fn propagate_signal_at(
 
         let current_signal = *signal;
         *signal = input_signal;
-        let transmitted_signal = if input_signal > 0 { input_signal - 1 } else { 0 };
 
+        if input_signal == 1 {
+            return
+        }
+
+        let transmitted_signal = if input_signal > 0 { input_signal - 1 } else { 0 };
+        //println!("{x} {y} signal is set to {}", *signal);
         listeners.entity_map_update.insert((x, y));
         for (idx, port) in output_ports.iter().enumerate() {
             if *port {
@@ -185,7 +193,7 @@ pub fn propagate_signal_at(
             }
         }
     }
-    if input_signal == 0 && prev_signal_type != None{
+    if input_signal == 0 && prev_signal_type != None {
         listeners.repropagate(x, y)
     }
 }
@@ -250,25 +258,25 @@ pub fn get_max_prev(
                         signal_type = Some(sig_type);
                     }
 
-                    let max_type_value = match max_signal_type {
-                        Some(SignalType::Strong(true)) => 10,
-                        Some(SignalType::Strong(false)) => 9,
-                        Some(SignalType::Weak(true)) => 8,
-                        Some(SignalType::Weak(false)) => 7,
-                        None => 0,
-                    };
+                    // let max_type_value = match max_signal_type {
+                    //     Some(SignalType::Strong(true)) => 10,
+                    //     Some(SignalType::Strong(false)) => 9,
+                    //     Some(SignalType::Weak(true)) => 8,
+                    //     Some(SignalType::Weak(false)) => 8,
+                    //     None => 0,
+                    // };
 
-                    let type_value = match signal_type {
-                        Some(SignalType::Strong(true)) => 10,
-                        Some(SignalType::Strong(false)) => 9,
-                        Some(SignalType::Weak(true)) => 8,
-                        Some(SignalType::Weak(false)) => 7,
-                        None => 0,
-                    };
+                    // let type_value = match signal_type {
+                    //     Some(SignalType::Strong(true)) => 10,
+                    //     Some(SignalType::Strong(false)) => 9,
+                    //     Some(SignalType::Weak(true)) => 8,
+                    //     Some(SignalType::Weak(false)) => 8,
+                    //     None => 0,
+                    // };
 
-                    if type_value > max_type_value {
-                        max_signal_type = signal_type;
-                    }
+                    // if type_value > max_type_value {
+                    max_signal_type = signal_type;
+                    // }
                 }
             }
         }
@@ -291,10 +299,8 @@ pub fn is_redstone(chunks: &Chunks, x: i128, y: i128, input_port: Orientation) -
     };
     if
         (redstone.input_ports[input_port.to_port_idx()] ||
-            redstone.kind == Some(RedstoneKind::Dust) ||
             redstone.output_ports[input_port.to_port_idx()]) &&
-        (redstone.signal_type == Some(SignalType::Strong(true)) ||
-            redstone.signal_type == Some(SignalType::Weak(true)))
+        redstone.is_redstone_component
     {
         true
     } else {

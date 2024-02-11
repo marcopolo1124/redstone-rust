@@ -1,11 +1,40 @@
 /* tslint:disable */
 /* eslint-disable */
+/**
+*/
+export function run(): void;
+/**
+*/
+export class SaveData {
+  free(): void;
+/**
+* @returns {SaveData}
+*/
+  static new_save(): SaveData;
+/**
+* @param {string} blk_type
+* @param {number} orientation
+* @param {bigint} x
+* @param {bigint} y
+* @param {number} state
+*/
+  append_block(blk_type: string, orientation: number, x: bigint, y: bigint, state: number): void;
+/**
+* @returns {string}
+*/
+  json_string(): string;
+}
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
   readonly main: (a: number, b: number) => number;
+  readonly __wbg_savedata_free: (a: number) => void;
+  readonly savedata_new_save: () => number;
+  readonly savedata_append_block: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+  readonly savedata_json_string: (a: number, b: number) => void;
+  readonly run: () => void;
   readonly wgpu_compute_pass_set_pipeline: (a: number, b: number) => void;
   readonly wgpu_compute_pass_set_bind_group: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly wgpu_compute_pass_set_push_constant: (a: number, b: number, c: number, d: number) => void;
@@ -56,11 +85,12 @@ export interface InitOutput {
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_export_2: WebAssembly.Table;
-  readonly _dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h0a985bc9bbc90dbd: (a: number, b: number, c: number) => void;
-  readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__hce1eeab656e114e5: (a: number, b: number) => void;
-  readonly _dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__hf9f4337c9d5ce2ce: (a: number, b: number, c: number) => void;
-  readonly wasm_bindgen__convert__closures__invoke0_mut__h1ee9639006e20540: (a: number, b: number) => void;
-  readonly wasm_bindgen__convert__closures__invoke1_mut__h07d86934371c2f54: (a: number, b: number, c: number) => void;
+  readonly _dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h01279313ae144df9: (a: number, b: number, c: number) => void;
+  readonly _dyn_core__ops__function__FnMut_____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__h6dd5ac2658d1471e: (a: number, b: number) => void;
+  readonly _dyn_core__ops__function__FnMut__A____Output___R_as_wasm_bindgen__closure__WasmClosure___describe__invoke__hf317a9f13b63535e: (a: number, b: number, c: number) => void;
+  readonly wasm_bindgen__convert__closures__invoke0_mut__h01df942d48d0637b: (a: number, b: number) => void;
+  readonly wasm_bindgen__convert__closures__invoke1_mut__h554f25f3137cc59b: (a: number, b: number, c: number) => void;
+  readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_exn_store: (a: number) => void;
   readonly __wbindgen_start: () => void;

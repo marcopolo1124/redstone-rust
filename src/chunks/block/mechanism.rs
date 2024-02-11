@@ -35,18 +35,19 @@ pub fn execute_mechanism(
     calculations: &mut u32,
     texture_to_block_map: &HashMap<TextureName, Block>
 ) {
-        let maybe_blk = chunks.get_block(x, y);
+    let maybe_blk = chunks.get_block(x, y);
     let blk = if let Some(blk) = maybe_blk {
         blk
     } else {
-                return;
+        return;
     };
+    let blk_ref = blk.clone();
 
     let Block { orientation, mechanism, redstone, movable, .. } = blk;
     let mechanism_kind = if let Some(mechanism_kind) = mechanism {
         mechanism_kind
     } else {
-                return;
+        return;
     };
 
     let orientation = *orientation;
@@ -88,15 +89,16 @@ pub fn execute_mechanism(
             }
         }
         MechanismKind::Piston { ref mut extended, sticky } => {
-            let rs = if let Some(rs) = redstone{
+            let rs = if let Some(rs) = redstone {
                 rs
-            } else{
-                return
+            } else {
+                return;
             };
             let is_sticky = *sticky;
             let piston_head = if is_sticky { STICKY_PISTON_HEAD } else { PISTON_HEAD };
             let mut traversed = HashSet::new();
             *movable = false;
+            //println!("{x} {y} executing with signal {}", rs.signal);
             if rs.signal > 0 && !*extended {
                 let (next_x, next_y) = orientation.get_next_coord(x, y);
                 let affected_blocks = get_power(chunks, next_x, next_y, orientation, 12);
@@ -140,7 +142,7 @@ pub fn execute_mechanism(
                     if let Some(movable) = get_movable(chunks, x, y) {
                         *movable = true;
                     }
-                    listeners.turn_mechanism_on(x, y, false);
+                    listeners.turn_mechanism_on(x, y, &blk_ref);
                 }
             } else if *extended && rs.signal <= 0 {
                 *extended = false;
@@ -188,6 +190,12 @@ pub fn execute_mechanism(
                 if let Some(movable) = get_movable(chunks, x, y) {
                     *movable = true;
                 }
+            } else {
+                if *extended {
+                    *movable = false;
+                } else {
+                    *movable = true;
+                }
             }
         }
         MechanismKind::Repeater { countdown, tick } => {
@@ -206,13 +214,13 @@ pub fn execute_mechanism(
             if *countdown > 0 {
                 *countdown -= 1;
                 if on {
-                    listeners.turn_mechanism_on(x, y, false);
+                    listeners.turn_mechanism_on(x, y, blk);
                 } else {
-                    listeners.turn_mechanism_off(x, y, false);
+                    listeners.turn_mechanism_off(x, y, blk);
                 }
             } else if *countdown == 0 {
                 *countdown -= 1;
-                if signal <= 0 && on {
+                if signal <= 0 {
                     propagate_signal_at(
                         chunks,
                         x,
@@ -225,7 +233,10 @@ pub fn execute_mechanism(
                         propagation_queue,
                         calculations
                     );
-                } else if signal > 0 && !on{
+                    if !on {
+                        listeners.turn_mechanism_off(x, y, &blk_ref);
+                    }
+                } else if !on {
                     propagate_signal_at(
                         chunks,
                         x,
@@ -247,7 +258,7 @@ pub fn execute_mechanism(
             } else {
                 return;
             };
-            if on && signal <= 0{
+            if on && signal <= 0 {
                 propagate_signal_at(
                     chunks,
                     x,
@@ -261,7 +272,7 @@ pub fn execute_mechanism(
                     calculations
                 );
 
-                listeners.turn_mechanism_off(x, y, true);
+                listeners.turn_mechanism_off(x, y, &blk_ref);
             } else {
                 propagate_signal_at(
                     chunks,
@@ -276,7 +287,7 @@ pub fn execute_mechanism(
                     calculations
                 );
             }
-        },
+        }
         MechanismKind::Lever => {
             let signal = if let Some(Redstone { signal, .. }) = redstone {
                 signal
@@ -310,7 +321,7 @@ pub fn execute_mechanism(
                     calculations
                 )
             }
-        },
+        }
         MechanismKind::Button => {
             let signal = if let Some(Redstone { signal, .. }) = redstone {
                 signal
@@ -343,29 +354,31 @@ pub fn execute_mechanism(
                     propagation_queue,
                     calculations
                 );
-                listeners.turn_mechanism_off(x, y, true)
+                listeners.turn_mechanism_off(x, y, &blk_ref)
             }
-        },
+        }
 
-        MechanismKind::Comparator{mode} => {
+        MechanismKind::Comparator { mode } => {
             let mode = *mode;
             let rs = if let Some(rs) = redstone {
                 rs
             } else {
-                return
+                return;
             };
             let rear_port = orientation.get_opposing();
             let rear_power = {
-                
                 let (rear_x, rear_y) = rear_port.get_next_coord(x, y);
-                if let Some(Block{redstone: Some(Redstone{signal, ..}), ..}) = chunks.get_block_ref(rear_x, rear_y){
+                if
+                    let Some(Block { redstone: Some(Redstone { signal, .. }), .. }) =
+                        chunks.get_block_ref(rear_x, rear_y)
+                {
                     *signal
-                } else{
+                } else {
                     0
                 }
             };
 
-            let signal = match mode{
+            let signal = match mode {
                 ComparatorModes::Compare => {
                     let (_, max_prev, _) = get_max_prev(chunks, x, y);
                     if rear_power >= max_prev {
@@ -376,30 +389,30 @@ pub fn execute_mechanism(
                 }
                 ComparatorModes::Subtract => {
                     let mut max_side_signal = 0;
-                    for (idx, port) in rs.input_ports.iter().enumerate(){
+                    for (idx, port) in rs.input_ports.iter().enumerate() {
                         let side_port = Orientation::port_idx_to_orientation(idx);
-                        if *port && side_port != rear_port{
+                        if *port && side_port != rear_port {
                             let (side_x, side_y) = side_port.get_next_coord(x, y);
-                            let side_signal = if let Some(Block{redstone: Some(Redstone{signal, ..}), ..}) = chunks.get_block_ref(side_x, side_y){
+                            let side_signal = if
+                                let Some(Block { redstone: Some(Redstone { signal, .. }), .. }) =
+                                    chunks.get_block_ref(side_x, side_y)
+                            {
                                 *signal
-                            } else{
+                            } else {
                                 0
                             };
 
-                            if side_signal > max_side_signal{
-                                max_side_signal = side_signal
+                            if side_signal > max_side_signal {
+                                max_side_signal = side_signal;
                             }
                         }
-                    };
-
+                    }
                     if rear_power >= max_side_signal {
                         rear_power - max_side_signal
-                    } else{
+                    } else {
                         0
                     }
                 }
-
-                
             };
 
             propagate_signal_at(
@@ -419,7 +432,7 @@ pub fn execute_mechanism(
                 x,
                 y,
                 None,
-                signal,
+                std::cmp::min(signal + 1, 16),
                 rs.signal + 1,
                 None,
                 listeners,
@@ -480,11 +493,11 @@ fn move_blocks(
         calculations,
         traversed,
         orientation.get_opposing(),
-        texture_to_block_map,
+        texture_to_block_map
     );
 
     if moved {
-        if 
+        if
             place(
                 chunks,
                 blk,

@@ -19,6 +19,7 @@ pub struct Block {
 pub struct Redstone {
     pub signal: u8,
     pub signal_type: Option<SignalType>,
+    pub is_redstone_component: bool,
     pub kind: Option<RedstoneKind>,
     pub signal_type_port_mapping: [Option<SignalType>; 4],
     pub input_ports: [bool; 4],
