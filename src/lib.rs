@@ -1,5 +1,5 @@
 mod chunks;
-use std::fs;
+mod saves;
 use std::{ f32::consts::PI, path::Path };
 use std::time::Duration;
 use bevy::asset::AssetMetaCheck;
@@ -670,18 +670,7 @@ pub fn run() {
         placeable.push(wool_blk);
     }
 
-    // let mut default_save = Vec::new();
-    // let start_x = 0;
-    // let start_y = 0;
-
-    let file_path = "saves/save_data.json";
-    let contents = fs::read_to_string(file_path)
-        .expect("Should have been able to read the file");
-    let save_data: SaveData = serde_json::from_str(&contents).unwrap();
-
-    // for (idx, blk) in placeable.iter().enumerate() {
-    //     default_save.push(((start_x as i128, start_y + idx as i128), *blk));
-    // }
+    let save_data: SaveData = serde_json::from_str(saves::SAVE).unwrap();
 
     App::new()
         .insert_resource(AssetMetaCheck::Never)
