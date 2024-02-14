@@ -257,26 +257,7 @@ pub fn get_max_prev(
                     if let Some(sig_type) = output_port_signal_type {
                         signal_type = Some(sig_type);
                     }
-
-                    // let max_type_value = match max_signal_type {
-                    //     Some(SignalType::Strong(true)) => 10,
-                    //     Some(SignalType::Strong(false)) => 9,
-                    //     Some(SignalType::Weak(true)) => 8,
-                    //     Some(SignalType::Weak(false)) => 8,
-                    //     None => 0,
-                    // };
-
-                    // let type_value = match signal_type {
-                    //     Some(SignalType::Strong(true)) => 10,
-                    //     Some(SignalType::Strong(false)) => 9,
-                    //     Some(SignalType::Weak(true)) => 8,
-                    //     Some(SignalType::Weak(false)) => 8,
-                    //     None => 0,
-                    // };
-
-                    // if type_value > max_type_value {
                     max_signal_type = signal_type;
-                    // }
                 }
             }
         }
